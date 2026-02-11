@@ -68,15 +68,20 @@ const defaultProfile: UserProfile = {
 };
 
 export async function getProfile(): Promise<UserProfile> {
-  const data = await AsyncStorage.getItem(PROFILE_KEY);
-  if (!data) return { ...defaultProfile };
-  const parsed = JSON.parse(data);
-  return {
-    ...defaultProfile,
-    ...parsed,
-    reminderPickTask: { ...defaultProfile.reminderPickTask, ...(parsed.reminderPickTask || {}) },
-    reminderCompleteTask: { ...defaultProfile.reminderCompleteTask, ...(parsed.reminderCompleteTask || {}) },
-  };
+  try {
+    const data = await AsyncStorage.getItem(PROFILE_KEY);
+    if (!data) return { ...defaultProfile };
+    const parsed = JSON.parse(data);
+    return {
+      ...defaultProfile,
+      ...parsed,
+      reminderPickTask: { ...defaultProfile.reminderPickTask, ...(parsed.reminderPickTask || {}) },
+      reminderCompleteTask: { ...defaultProfile.reminderCompleteTask, ...(parsed.reminderCompleteTask || {}) },
+    };
+  } catch (e) {
+    console.error('Failed to parse profile data:', e);
+    return { ...defaultProfile };
+  }
 }
 
 export async function saveProfile(profile: UserProfile): Promise<void> {
@@ -84,9 +89,14 @@ export async function saveProfile(profile: UserProfile): Promise<void> {
 }
 
 export async function getAllEntries(): Promise<Record<string, DailyEntry>> {
-  const data = await AsyncStorage.getItem(ENTRIES_KEY);
-  if (!data) return {};
-  return JSON.parse(data);
+  try {
+    const data = await AsyncStorage.getItem(ENTRIES_KEY);
+    if (!data) return {};
+    return JSON.parse(data);
+  } catch (e) {
+    console.error('Failed to parse entries data:', e);
+    return {};
+  }
 }
 
 export async function getEntry(date: string): Promise<DailyEntry | null> {

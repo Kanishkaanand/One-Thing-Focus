@@ -33,7 +33,7 @@ import * as ImagePicker from 'expo-image-picker';
 import Colors from '@/constants/colors';
 import OrganicCheck from '@/components/OrganicCheck';
 import { useApp } from '@/lib/AppContext';
-import { DailyEntry, saveEntry } from '@/lib/storage';
+import { DailyEntry, saveEntry, TaskItem } from '@/lib/storage';
 import { getGreeting, formatDate, getTodayDate, getStreakMessage } from '@/lib/storage';
 
 type MoodType = 'energized' | 'calm' | 'neutral' | 'tough';
@@ -122,7 +122,7 @@ function CompletedTaskCard({
   animate,
   onProofTap,
 }: {
-  task: any;
+  task: TaskItem;
   animate: boolean;
   onProofTap?: (uri: string) => void;
 }) {
@@ -168,7 +168,7 @@ function CompletedTaskCard({
   );
 }
 
-function ActiveTaskCard({ task, onComplete }: { task: any; onComplete: (id: string) => void }) {
+function ActiveTaskCard({ task, onComplete }: { task: TaskItem; onComplete: (id: string) => void }) {
   const scale = useSharedValue(1);
 
   const cardStyle = useAnimatedStyle(() => ({
@@ -426,10 +426,14 @@ export default function HomeScreen() {
 
   const handleAddTask = async () => {
     if (!taskInput.trim()) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await addTask(taskInput.trim());
-    setTaskInput('');
-    setShowInput(false);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await addTask(taskInput.trim());
+      setTaskInput('');
+      setShowInput(false);
+    } catch (e) {
+      console.error('Failed to add task:', e);
+    }
   };
 
   const handleCompleteTask = (taskId: string) => {
@@ -443,10 +447,16 @@ export default function HomeScreen() {
     let hadProof = false;
 
     if (type === 'skip') {
-      await completeTask(completingTaskId);
-      setShowProofSheet(false);
-      setCompletingTaskId(null);
-      checkForCompletion(false);
+      try {
+        await completeTask(completingTaskId);
+        setShowProofSheet(false);
+        setCompletingTaskId(null);
+        checkForCompletion(false);
+      } catch (e) {
+        console.error('Failed to complete task:', e);
+        setShowProofSheet(false);
+        setCompletingTaskId(null);
+      }
       return;
     }
 
@@ -465,7 +475,8 @@ export default function HomeScreen() {
       } else {
         await completeTask(completingTaskId);
       }
-    } catch {
+    } catch (e) {
+      console.error('Failed to pick image:', e);
       await completeTask(completingTaskId);
     }
 
@@ -512,10 +523,14 @@ export default function HomeScreen() {
   };
 
   const handleReflection = async (mood: MoodType) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await addReflection(mood, reflectionNote.trim() || undefined);
-    setShowReflection(false);
-    setReflectionNote('');
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await addReflection(mood, reflectionNote.trim() || undefined);
+      setShowReflection(false);
+      setReflectionNote('');
+    } catch (e) {
+      console.error('Failed to save reflection:', e);
+    }
   };
 
   if (isLoading || !profile) return <View style={[styles.container, { paddingTop: insets.top }]} />;

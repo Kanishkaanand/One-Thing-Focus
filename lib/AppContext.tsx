@@ -136,7 +136,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       if (newProfile.currentLevelStreak >= 7 && newProfile.currentLevel < 3) {
-        const newLevel = (newProfile.currentLevel + 1) as 1 | 2 | 3;
+        const newLevel = Math.min(newProfile.currentLevel + 1, 3) as 1 | 2 | 3;
         newProfile.currentLevel = newLevel;
         newProfile.currentLevelStreak = 0;
         setJustLeveledUp(true);
