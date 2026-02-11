@@ -9,6 +9,7 @@ import {
   FlatList,
   Platform,
   ScrollView,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -281,7 +282,10 @@ export default function OnboardingScreen() {
 
   if (showNameInput) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top + webTopInset, paddingBottom: insets.bottom + webBottomInset }]}>
+      <KeyboardAvoidingView
+        style={[styles.container, { paddingTop: insets.top + webTopInset, paddingBottom: insets.bottom + webBottomInset }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <Animated.View entering={FadeIn.duration(500)} style={styles.nameContainer}>
           <View style={styles.nameIconWrap}>
             <Feather name="user" size={32} color={Colors.accent} />
@@ -309,7 +313,7 @@ export default function OnboardingScreen() {
             <Text style={styles.skipText}>Skip for now</Text>
           </Pressable>
         </Animated.View>
-      </View>
+      </KeyboardAvoidingView>
     );
   }
 
