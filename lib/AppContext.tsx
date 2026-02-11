@@ -168,12 +168,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const resetAllData = useCallback(async () => {
     await clearAllData();
-    setProfile(null);
-    setTodayEntry(null);
-    setEntries({});
     setJustLeveledUp(false);
     setYesterdayMissed(false);
-  }, []);
+    await loadData();
+  }, [loadData]);
 
   const canAddMoreTasks = useMemo(() => {
     if (!profile || !todayEntry) return true;
