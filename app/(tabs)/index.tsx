@@ -111,6 +111,7 @@ function AnimatedCheckmark({ animate, delay: startDelay }: { animate: boolean; d
         animate={animate}
         animationDuration={600}
         animationDelay={animate ? startDelay : 0}
+        showCircle={true}
       />
     </Animated.View>
   );
@@ -642,13 +643,13 @@ export default function HomeScreen() {
             <View style={styles.watermarkWrap}>
               <OrganicCheck
                 size={200}
-                color={Colors.background}
+                color={Colors.accent}
                 opacity={0.06}
-                strokeWidth={48}
+                showCircle={true}
               />
             </View>
             <View style={styles.emptyIconWrap}>
-              <OrganicCheck size={48} color={Colors.accent} />
+              <OrganicCheck size={56} color={Colors.accent} showCircle={true} />
             </View>
             <Text style={styles.emptyTitle}>What's your one thing today?</Text>
             <Text style={styles.emptySubtitle}>
