@@ -214,6 +214,41 @@ function ActiveTaskCard({ task, onComplete }: { task: any; onComplete: (id: stri
   );
 }
 
+function FloatingParticle({ delay, startX, emoji }: { delay: number; startX: number; emoji: string }) {
+  const translateY = useSharedValue(0);
+  const opacity = useSharedValue(0);
+  const translateX = useSharedValue(startX);
+  const rotate = useSharedValue(0);
+
+  useEffect(() => {
+    opacity.value = withDelay(delay, withSequence(
+      withTiming(1, { duration: 300 }),
+      withDelay(1200, withTiming(0, { duration: 600 }))
+    ));
+    translateY.value = withDelay(delay, withTiming(-180, { duration: 2100, easing: Easing.out(Easing.cubic) }));
+    translateX.value = withDelay(delay, withTiming(startX + (Math.random() - 0.5) * 60, { duration: 2100 }));
+    rotate.value = withDelay(delay, withTiming((Math.random() - 0.5) * 40, { duration: 2100 }));
+  }, []);
+
+  const style = useAnimatedStyle(() => ({
+    position: 'absolute' as const,
+    opacity: opacity.value,
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { rotate: `${rotate.value}deg` },
+    ],
+  }));
+
+  return (
+    <Animated.View style={style}>
+      <Text style={{ fontSize: 24 }}>{emoji}</Text>
+    </Animated.View>
+  );
+}
+
+const CELEBRATION_EMOJIS = ['🎉', '✨', '🌟', '💪', '🔥', '⭐'];
+
 function CelebrationOverlay({ visible, streak, leveledUp, onDismiss }: {
   visible: boolean;
   streak: number;
@@ -223,30 +258,54 @@ function CelebrationOverlay({ visible, streak, leveledUp, onDismiss }: {
   if (!visible) return null;
 
   const streakMsg = getStreakMessage(streak);
+  const celebScale = useSharedValue(0);
+
+  useEffect(() => {
+    celebScale.value = withDelay(100, withSequence(
+      withSpring(1.15, { damping: 6, stiffness: 120 }),
+      withSpring(1, { damping: 12 })
+    ));
+  }, []);
+
+  const iconAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: celebScale.value }],
+  }));
+
+  const particles = Array.from({ length: 8 }, (_, i) => ({
+    delay: 200 + i * 120,
+    startX: (i - 4) * 30,
+    emoji: CELEBRATION_EMOJIS[i % CELEBRATION_EMOJIS.length],
+  }));
 
   return (
     <Modal transparent visible={visible} animationType="fade">
       <Pressable style={styles.celebrationOverlay} onPress={onDismiss}>
         <Animated.View entering={FadeIn.duration(300)} style={styles.celebrationContent}>
-          <Animated.View entering={FadeInDown.delay(100).springify()}>
+          <View style={styles.particlesContainer}>
+            {particles.map((p, i) => (
+              <FloatingParticle key={i} delay={p.delay} startX={p.startX} emoji={p.emoji} />
+            ))}
+          </View>
+          <Animated.View style={iconAnimStyle}>
             <View style={[styles.celebrationIcon, leveledUp && { backgroundColor: Colors.streakGlow + '30' }]}>
-              <Feather
-                name={leveledUp ? 'award' : 'check-circle'}
-                size={48}
-                color={leveledUp ? Colors.streakGlow : Colors.success}
-              />
+              <Text style={{ fontSize: 44 }}>{leveledUp ? '🏆' : '🎉'}</Text>
             </View>
           </Animated.View>
-          <Animated.Text entering={FadeInDown.delay(200)} style={styles.celebrationTitle}>
-            {leveledUp ? 'Level Up!' : 'Well done!'}
+          <Animated.Text entering={FadeInDown.delay(300)} style={styles.celebrationTitle}>
+            {leveledUp ? 'Level Up!' : 'Nailed it!'}
           </Animated.Text>
-          <Animated.Text entering={FadeInDown.delay(350)} style={styles.celebrationSubtitle}>
+          <Animated.Text entering={FadeInDown.delay(450)} style={styles.celebrationSubtitle}>
             {leveledUp
-              ? "You've unlocked more tasks per day!"
-              : streakMsg || 'One thing done. That\'s all it takes.'
+              ? "You've unlocked more tasks per day! 🚀"
+              : streakMsg || 'One thing done. That\'s all it takes. ✨'
             }
           </Animated.Text>
-          <Animated.View entering={FadeInDown.delay(500)}>
+          {streak > 0 && !leveledUp && (
+            <Animated.View entering={FadeInDown.delay(550)} style={styles.celebrationStreakBadge}>
+              <Text style={styles.celebrationStreakText}>🔥 {streak} day streak</Text>
+            </Animated.View>
+          )}
+          <Animated.View entering={FadeInDown.delay(650)}>
             <Pressable style={styles.celebrationButton} onPress={onDismiss}>
               <Text style={styles.celebrationButtonText}>Continue</Text>
             </Pressable>
@@ -538,7 +597,9 @@ export default function HomeScreen() {
             )}
 
             <Animated.View style={[styles.footerWrap, footerAnimStyle]}>
+              <Text style={styles.footerEmoji}>🌙</Text>
               <Text style={styles.footerText}>See you tomorrow</Text>
+              <Text style={styles.footerSubtext}>Rest up, you earned it ✨</Text>
             </Animated.View>
           </View>
         ) : hasTasks ? (
@@ -976,10 +1037,20 @@ const styles = StyleSheet.create({
     marginTop: 60,
     alignItems: 'center',
     paddingBottom: 40,
+    gap: 6,
+  },
+  footerEmoji: {
+    fontSize: 28,
+    marginBottom: 4,
   },
   footerText: {
+    fontFamily: 'Nunito_600SemiBold',
+    fontSize: 16,
+    color: Colors.textSecondary,
+  },
+  footerSubtext: {
     fontFamily: 'DMSans_400Regular',
-    fontSize: 14,
+    fontSize: 13,
     color: Colors.neutral,
   },
 
@@ -1205,7 +1276,7 @@ const styles = StyleSheet.create({
 
   celebrationOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(250, 247, 242, 0.92)',
+    backgroundColor: 'rgba(250, 247, 242, 0.95)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
@@ -1214,32 +1285,51 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
   },
+  particlesContainer: {
+    position: 'absolute',
+    top: '40%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 200,
+    height: 200,
+  },
   celebrationIcon: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
     backgroundColor: Colors.successLight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   celebrationTitle: {
     fontFamily: 'Nunito_700Bold',
-    fontSize: 28,
+    fontSize: 32,
     color: Colors.textPrimary,
   },
   celebrationSubtitle: {
     fontFamily: 'DMSans_400Regular',
-    fontSize: 16,
+    fontSize: 17,
     color: Colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 26,
     maxWidth: 280,
+  },
+  celebrationStreakBadge: {
+    backgroundColor: Colors.streakGlow + '20',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  celebrationStreakText: {
+    fontFamily: 'Nunito_600SemiBold',
+    fontSize: 15,
+    color: Colors.textPrimary,
   },
   celebrationButton: {
     backgroundColor: Colors.accent,
     paddingVertical: 14,
-    paddingHorizontal: 32,
+    paddingHorizontal: 40,
     borderRadius: 16,
     marginTop: 8,
   },

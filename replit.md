@@ -55,3 +55,7 @@ constants/
 - Initial build: Full app implementation with onboarding, home, calendar, profile screens
 - Added dual-reminder notification system with state-aware scheduling
 - Added completed state (State C) for home screen with animated checkmark, contextual completion messages, journal-style reflection, and "See you tomorrow" footer
+- Enhanced celebration overlay: floating emoji particles, bounce animation, streak badge, bigger icon with emoji
+- Added emojis to footer: moon emoji, "Rest up, you earned it" sparkle subtext
+- Added reset app data feature in profile settings with confirmation modal
+- Fixed streak persistence bug in processEndOfDay (no longer resets for new users or inactive days)
