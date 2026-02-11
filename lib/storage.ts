@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { parseUserProfile, parseEntries } from './validation';
 
 export interface ReminderConfig {
   enabled: boolean;
@@ -72,12 +73,24 @@ export async function getProfile(): Promise<UserProfile> {
     const data = await AsyncStorage.getItem(PROFILE_KEY);
     if (!data) return { ...defaultProfile };
     const parsed = JSON.parse(data);
-    return {
+
+    // Merge with defaults first to ensure all fields exist
+    const merged = {
       ...defaultProfile,
       ...parsed,
       reminderPickTask: { ...defaultProfile.reminderPickTask, ...(parsed.reminderPickTask || {}) },
       reminderCompleteTask: { ...defaultProfile.reminderCompleteTask, ...(parsed.reminderCompleteTask || {}) },
     };
+
+    // Validate with Zod schema
+    const validated = parseUserProfile(merged);
+    if (validated) {
+      return validated;
+    }
+
+    // If validation fails, return merged data (backwards compatibility)
+    console.warn('Profile validation failed, using merged defaults');
+    return merged;
   } catch (e) {
     console.error('Failed to parse profile data:', e);
     return { ...defaultProfile };
@@ -92,7 +105,10 @@ export async function getAllEntries(): Promise<Record<string, DailyEntry>> {
   try {
     const data = await AsyncStorage.getItem(ENTRIES_KEY);
     if (!data) return {};
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+
+    // Validate entries with Zod schema (filters out invalid entries)
+    return parseEntries(parsed);
   } catch (e) {
     console.error('Failed to parse entries data:', e);
     return {};

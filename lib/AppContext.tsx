@@ -13,6 +13,7 @@ import {
   clearAllData,
 } from './storage';
 import { syncNotifications, rescheduleAllReminders } from './notifications';
+import { validateTaskInput, validateNoteInput } from './validation';
 
 interface AppContextValue {
   profile: UserProfile | null;
@@ -89,6 +90,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addTask = useCallback(async (text: string) => {
     if (!profile) return;
+
+    // Validate and sanitize input
+    const validation = validateTaskInput(text);
+    if (!validation.valid) {
+      throw new Error(validation.error);
+    }
+    const sanitizedText = validation.sanitized!;
+
     const today = getTodayDate();
     const current = todayEntry || {
       date: today,
@@ -99,7 +108,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const newTask: TaskItem = {
       id: generateId(),
-      text,
+      text: sanitizedText,
       createdAt: new Date().toISOString(),
       isCompleted: false,
     };
@@ -160,9 +169,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addReflection = useCallback(async (mood: 'energized' | 'calm' | 'neutral' | 'tough', note?: string) => {
     if (!todayEntry) return;
+
+    // Validate and sanitize note if provided
+    let sanitizedNote: string | undefined;
+    if (note) {
+      const validation = validateNoteInput(note);
+      if (!validation.valid) {
+        throw new Error(validation.error);
+      }
+      sanitizedNote = validation.sanitized;
+    }
+
     const updated: DailyEntry = {
       ...todayEntry,
-      reflection: { mood, note },
+      reflection: { mood, note: sanitizedNote },
     };
     await saveEntry(updated);
     setTodayEntry(updated);
