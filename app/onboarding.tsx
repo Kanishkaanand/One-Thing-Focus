@@ -324,6 +324,11 @@ export default function OnboardingScreen() {
         scrollEnabled={false}
         renderItem={({ item, index }) => <SlideItem item={item} index={index} />}
         keyExtractor={item => item.key}
+        getItemLayout={(_, index) => ({
+          length: SCREEN_WIDTH,
+          offset: SCREEN_WIDTH * index,
+          index,
+        })}
       />
 
       <View style={styles.bottomArea}>
