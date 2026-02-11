@@ -147,20 +147,24 @@ export async function processEndOfDay(profile: UserProfile, entries: Record<stri
 
   const yesterdayEntry = entries[yesterdayStr];
 
-  if (!yesterdayEntry || !yesterdayEntry.completed) {
-    if (profile.currentLevel > 1) {
-      const newLevel = (profile.currentLevel - 1) as 1 | 2 | 3;
-      return {
-        ...profile,
-        currentLevel: newLevel,
-        currentLevelStreak: 0,
-      };
-    } else {
-      return {
-        ...profile,
-        currentLevelStreak: 0,
-      };
+  if (!yesterdayEntry) {
+    if (profile.currentLevelStreak > 0) {
+      const hasAnyPriorEntry = Object.keys(entries).some(d => d < yesterdayStr);
+      if (hasAnyPriorEntry) {
+        if (profile.currentLevel > 1) {
+          return { ...profile, currentLevel: (profile.currentLevel - 1) as 1 | 2 | 3, currentLevelStreak: 0 };
+        }
+        return { ...profile, currentLevelStreak: 0 };
+      }
     }
+    return profile;
+  }
+
+  if (yesterdayEntry.tasks.length > 0 && !yesterdayEntry.completed) {
+    if (profile.currentLevel > 1) {
+      return { ...profile, currentLevel: (profile.currentLevel - 1) as 1 | 2 | 3, currentLevelStreak: 0 };
+    }
+    return { ...profile, currentLevelStreak: 0 };
   }
 
   return profile;
