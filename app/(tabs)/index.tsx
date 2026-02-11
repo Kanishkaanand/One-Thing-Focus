@@ -31,6 +31,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import Colors from '@/constants/colors';
+import OrganicCheck from '@/components/OrganicCheck';
 import { useApp } from '@/lib/AppContext';
 import { DailyEntry, saveEntry } from '@/lib/storage';
 import { getGreeting, formatDate, getTodayDate, getStreakMessage } from '@/lib/storage';
@@ -82,15 +83,10 @@ const moodDisplay: Record<string, { icon: string; label: string }> = {
 const SAGE_GREEN = '#7DB07A';
 
 function AnimatedCheckmark({ animate, delay: startDelay }: { animate: boolean; delay: number }) {
-  const progress = useSharedValue(0);
   const pulseScale = useSharedValue(1);
 
   useEffect(() => {
     if (animate) {
-      progress.value = withDelay(
-        startDelay,
-        withTiming(1, { duration: 600, easing: Easing.out(Easing.cubic) })
-      );
       pulseScale.value = withDelay(
         startDelay + 600,
         withSequence(
@@ -99,7 +95,6 @@ function AnimatedCheckmark({ animate, delay: startDelay }: { animate: boolean; d
         )
       );
     } else {
-      progress.value = 1;
       pulseScale.value = 1;
     }
   }, [animate]);
@@ -108,16 +103,15 @@ function AnimatedCheckmark({ animate, delay: startDelay }: { animate: boolean; d
     transform: [{ scale: pulseScale.value }],
   }));
 
-  const checkStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value, [0, 0.3, 1], [0, 1, 1]),
-    transform: [{ scale: interpolate(progress.value, [0, 0.5, 1], [0.5, 1.1, 1]) }],
-  }));
-
   return (
-    <Animated.View style={[styles.completedCheckCircle, containerStyle]}>
-      <Animated.View style={checkStyle}>
-        <Feather name="check" size={18} color="#FFF" />
-      </Animated.View>
+    <Animated.View style={[styles.completedCheckWrap, containerStyle]}>
+      <OrganicCheck
+        size={32}
+        color={SAGE_GREEN}
+        animate={animate}
+        animationDuration={600}
+        animationDelay={animate ? startDelay : 0}
+      />
     </Animated.View>
   );
 }
@@ -645,8 +639,16 @@ export default function HomeScreen() {
           </View>
         ) : (
           <Animated.View entering={FadeInDown.delay(400).duration(500)} style={styles.emptyState}>
+            <View style={styles.watermarkWrap}>
+              <OrganicCheck
+                size={200}
+                color={Colors.background}
+                opacity={0.06}
+                strokeWidth={48}
+              />
+            </View>
             <View style={styles.emptyIconWrap}>
-              <Feather name="edit-3" size={32} color={Colors.accent} />
+              <OrganicCheck size={48} color={Colors.accent} />
             </View>
             <Text style={styles.emptyTitle}>What's your one thing today?</Text>
             <Text style={styles.emptySubtitle}>
@@ -1013,14 +1015,12 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 14,
   },
-  completedCheckCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: SAGE_GREEN,
+  completedCheckWrap: {
+    width: 32,
+    height: 32,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 1,
+    marginTop: -2,
   },
   completedCardTextWrap: {
     flex: 1,
@@ -1098,6 +1098,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 60,
     gap: 12,
+  },
+  watermarkWrap: {
+    position: 'absolute',
+    top: 80,
+    alignSelf: 'center',
   },
   emptyIconWrap: {
     width: 80,

@@ -20,6 +20,7 @@ import Animated, {
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
+import OrganicCheck from '@/components/OrganicCheck';
 import { useApp } from '@/lib/AppContext';
 import { formatTime12h } from '@/lib/storage';
 import { requestNotificationPermissions } from '@/lib/notifications';
@@ -134,16 +135,23 @@ function TimePickerInline({
 }
 
 function SlideItem({ item, index }: { item: typeof slides[0]; index: number }) {
+  const isLastSlide = index === 2;
   return (
     <View style={[styles.slide, { width: SCREEN_WIDTH }]}>
       <Animated.View entering={FadeIn.delay(200).duration(600)} style={styles.iconContainer}>
-        <View style={[styles.iconCircle, index === 1 && styles.iconCircleAccent]}>
-          <Feather
-            name={item.icon}
-            size={40}
-            color={index === 1 ? Colors.accent : Colors.textSecondary}
-          />
-        </View>
+        {isLastSlide ? (
+          <View style={[styles.iconCircle, styles.iconCircleAccent]}>
+            <OrganicCheck size={80} color={Colors.accent} />
+          </View>
+        ) : (
+          <View style={[styles.iconCircle, index === 1 && styles.iconCircleAccent]}>
+            <Feather
+              name={item.icon}
+              size={40}
+              color={index === 1 ? Colors.accent : Colors.textSecondary}
+            />
+          </View>
+        )}
       </Animated.View>
       <Animated.Text
         entering={FadeInDown.delay(300).duration(500)}
