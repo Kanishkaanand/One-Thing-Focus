@@ -1,0 +1,110 @@
+# Incremental Prompt — App Logo: The Organic Check
+
+Replace any placeholder or existing logo with "The Organic Check" logo throughout the app. Do NOT restructure existing screens or logic.
+
+---
+
+## Logo Concept
+
+The app logo is a warm, hand-drawn style checkmark on a soft cream background. It feels like someone marked something "done" with a pen — human, satisfying, and approachable. NOT a corporate geometric checkmark.
+
+---
+
+## Logo SVG (Source)
+
+Use this exact SVG as the app logo source. Render it at different sizes as needed throughout the app.
+
+```svg
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <clipPath id="iconClip">
+      <rect x="0" y="0" width="1024" height="1024" rx="228" ry="228"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#iconClip)">
+    <!-- Warm cream background -->
+    <rect x="0" y="0" width="1024" height="1024" fill="#FAF7F2"/>
+    <!-- Organic checkmark -->
+    <path
+      d="M 280 540 C 300 540 380 640 420 700 C 460 640 580 400 740 300"
+      stroke="#E8913A"
+      stroke-width="48"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      fill="none"
+    />
+  </g>
+</svg>
+```
+
+### Key Visual Properties
+- **Checkmark stroke color:** #E8913A (golden amber — the app's accent color)
+- **Stroke width:** 48px at 1024x1024 (scale proportionally)
+- **Stroke caps:** Round (stroke-linecap="round") — this is critical for the organic feel
+- **Stroke joins:** Round (stroke-linejoin="round")
+- **Background:** #FAF7F2 (warm cream)
+- **Icon corners:** iOS-standard rounded rect (rx/ry = 22.37% of size)
+- The checkmark should NOT be a perfect geometric angle — it has a slight organic curve, as if drawn by hand with a thick marker
+
+---
+
+## Where to Use the Logo
+
+### 1. App Icon (Home Screen)
+- Use the full SVG above as the app icon
+- Export at all required iOS sizes: 1024, 180, 167, 152, 120, 87, 80, 60, 40
+- Export at all required Android sizes: 512, 432, 324, 216, 162, 108
+- The rounded corners are applied by the OS on home screen — but include them in the asset for App Store/Play Store listing previews
+
+### 2. Launch / Splash Screen
+- Display the checkmark graphic only (WITHOUT the rounded rect background) at 120x120px, centered
+- Below it: "One Thing" in heading font (Fraunces/Lora/Nunito), 28px, warm charcoal (#2D2A26)
+- Below that: Randomly selected tagline in body font, 16px, italic, secondary color (#8A8580)
+- Background: Warm cream (#FAF7F2) — full screen
+
+**Launch screen animation:**
+1. **0ms:** Warm cream background appears
+2. **200ms:** Checkmark draws itself using a stroke-dashoffset animation (dasharray = total path length, animate dashoffset from full length to 0 over 800ms with ease-out). This is the signature animation — the checkmark "writes itself" like someone drawing it with a pen.
+3. **700ms:** "One Thing" text fades in (300ms)
+4. **1000ms:** Tagline fades in with slight upward movement (300ms)
+5. **2200ms:** Entire screen fades out (400ms)
+6. **2600ms:** Home Screen fully visible
+
+### 3. Onboarding Screens
+- Use the checkmark graphic (without background) as a visual element on the final onboarding screen
+- Smaller size: 80x80px
+- Can have a subtle pulse/glow animation to draw attention to the CTA
+
+### 4. Empty State on Home Screen
+- When no task is set (State A), show a very faint, large version of the checkmark (opacity 0.06) as a watermark in the background center
+- This creates a subtle visual goal — "this is what completion looks like"
+
+### 5. Task Completion Animation
+- When a user marks a task complete, the checkmark draws itself on the task card using the same stroke-dashoffset animation from the launch screen
+- Size: 32x32px on the task card
+- Color: #7DB07A (sage green) for in-card completion — use the amber (#E8913A) only for the app icon and splash
+- Animation duration: 600ms with ease-out
+
+---
+
+## Color Variations
+
+The checkmark is used in different colors depending on context:
+
+| Context | Color | Hex |
+|---------|-------|-----|
+| App icon | Golden amber | #E8913A |
+| Splash screen | Golden amber | #E8913A |
+| Task completion (in-card) | Sage green | #7DB07A |
+| Calendar completed day | Sage green | #7DB07A |
+| Empty state watermark | Warm cream (barely visible) | #FAF7F2 at 6% opacity over background |
+
+---
+
+## What NOT to Do
+
+- ❌ Do not use a geometric, angular checkmark — it must feel organic and hand-drawn
+- ❌ Do not use a filled checkmark — it's always a stroke/outline
+- ❌ Do not make the stroke too thin — the thick, rounded stroke IS the personality
+- ❌ Do not use the checkmark with a circle around it — it stands alone
+- ❌ Do not change the curve of the check — the slight organic bend differentiates it from every other task app's checkmark
