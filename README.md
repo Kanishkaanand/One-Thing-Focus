@@ -8,13 +8,6 @@ A minimalist daily task commitment app that helps you focus on completing **one 
 
 In a world of endless to-do lists and constant overwhelm, One-Thing-Focus takes a different approach: **do less, but do it fully**. By committing to just one task each day, you build consistency, reduce decision fatigue, and make meaningful progress without burnout.
 
-## Screenshots
-
-<!-- Add your app screenshots here -->
-| Today | Calendar | Profile |
-|-------|----------|---------|
-| ![Today Screen](screenshots/today.png) | ![Calendar Screen](screenshots/calendar.png) | ![Profile Screen](screenshots/profile.png) |
-
 ## Features
 
 ### Core Functionality
