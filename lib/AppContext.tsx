@@ -29,6 +29,8 @@ interface AppContextValue {
   yesterdayMissed: boolean;
   justLeveledUp: boolean;
   setJustLeveledUp: (v: boolean) => void;
+  onResetCallback: (() => void) | null;
+  setOnResetCallback: (cb: (() => void) | null) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -40,6 +42,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [yesterdayMissed, setYesterdayMissed] = useState(false);
   const [justLeveledUp, setJustLeveledUp] = useState(false);
+  const [onResetCallback, setOnResetCallback] = useState<(() => void) | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -170,8 +173,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await clearAllData();
     setJustLeveledUp(false);
     setYesterdayMissed(false);
+    onResetCallback?.();
     await loadData();
-  }, [loadData]);
+  }, [loadData, onResetCallback]);
 
   const canAddMoreTasks = useMemo(() => {
     if (!profile || !todayEntry) return true;
@@ -194,7 +198,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     yesterdayMissed,
     justLeveledUp,
     setJustLeveledUp,
-  }), [profile, todayEntry, entries, isLoading, updateProfile, addTask, completeTask, addReflection, canAddMoreTasks, loadData, resetAllData, yesterdayMissed, justLeveledUp]);
+    onResetCallback,
+    setOnResetCallback,
+  }), [profile, todayEntry, entries, isLoading, updateProfile, addTask, completeTask, addReflection, canAddMoreTasks, loadData, resetAllData, yesterdayMissed, justLeveledUp, onResetCallback]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
