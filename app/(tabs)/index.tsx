@@ -320,6 +320,18 @@ export default function HomeScreen() {
   const reflectionOpacity = useSharedValue(0);
   const footerOpacity = useSharedValue(0);
 
+  const messageAnimStyle = useAnimatedStyle(() => ({
+    opacity: messageOpacity.value,
+  }));
+
+  const reflectionAnimStyle = useAnimatedStyle(() => ({
+    opacity: reflectionOpacity.value,
+  }));
+
+  const footerAnimStyle = useAnimatedStyle(() => ({
+    opacity: footerOpacity.value,
+  }));
+
   useEffect(() => {
     if (allDone && todayEntry) {
       if (!todayEntry.completionAnimationSeen && !justCompletedRef.current) {
@@ -443,18 +455,6 @@ export default function HomeScreen() {
   const completionMsg = allDone && todayEntry
     ? getCompletionMessage(todayEntry, streakDays, justLeveledUp, justLeveledUp ? (profile.currentLevel - 1) : undefined)
     : null;
-
-  const messageAnimStyle = useAnimatedStyle(() => ({
-    opacity: messageOpacity.value,
-  }));
-
-  const reflectionAnimStyle = useAnimatedStyle(() => ({
-    opacity: reflectionOpacity.value,
-  }));
-
-  const footerAnimStyle = useAnimatedStyle(() => ({
-    opacity: footerOpacity.value,
-  }));
 
   return (
     <View style={styles.container}>
@@ -585,6 +585,7 @@ export default function HomeScreen() {
         {showInput && (
           <Animated.View entering={SlideInUp.duration(300)} style={styles.inputCard}>
             <TextInput
+              testID="task-input"
               style={styles.taskInput}
               placeholder="What will you focus on?"
               placeholderTextColor={Colors.neutral}
