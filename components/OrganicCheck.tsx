@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Circle } from 'react-native-svg';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
@@ -15,6 +15,7 @@ interface OrganicCheckProps {
   animationDuration?: number;
   animationDelay?: number;
   opacity?: number;
+  showCircle?: boolean;
 }
 
 export default function OrganicCheck({
@@ -25,9 +26,10 @@ export default function OrganicCheck({
   animationDuration = 800,
   animationDelay = 0,
   opacity = 1,
+  showCircle = false,
 }: OrganicCheckProps) {
   const dashOffset = useRef(new Animated.Value(animate ? PATH_LENGTH : 0)).current;
-  const scaledStroke = strokeWidth ?? (56 * size) / 1024;
+  const scaledStroke = strokeWidth ?? (80 * size) / 1024;
 
   useEffect(() => {
     if (animate) {
@@ -46,6 +48,8 @@ export default function OrganicCheck({
     }
   }, [animate]);
 
+  const circleStroke = Math.max(scaledStroke * 0.5, 3);
+
   return (
     <Svg
       width={size}
@@ -53,10 +57,21 @@ export default function OrganicCheck({
       viewBox="0 0 1024 1024"
       style={{ opacity }}
     >
+      {showCircle && (
+        <Circle
+          cx={512}
+          cy={512}
+          r={440}
+          stroke={color}
+          strokeWidth={circleStroke}
+          fill="none"
+          opacity={0.25}
+        />
+      )}
       <AnimatedPath
         d={CHECK_PATH}
         stroke={color}
-        strokeWidth={scaledStroke > 0 ? scaledStroke : 56}
+        strokeWidth={scaledStroke > 0 ? scaledStroke : 80}
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"
