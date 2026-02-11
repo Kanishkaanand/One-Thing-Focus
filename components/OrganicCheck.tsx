@@ -4,8 +4,8 @@ import Svg, { Path } from 'react-native-svg';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
-const CHECK_PATH = "M 280 540 C 300 540 380 640 420 700 C 460 640 580 400 740 300";
-const PATH_LENGTH = 650;
+const CHECK_PATH = "M 250 540 L 420 720 L 780 280";
+const PATH_LENGTH = 750;
 
 interface OrganicCheckProps {
   size?: number;
@@ -27,7 +27,7 @@ export default function OrganicCheck({
   opacity = 1,
 }: OrganicCheckProps) {
   const dashOffset = useRef(new Animated.Value(animate ? PATH_LENGTH : 0)).current;
-  const scaledStroke = strokeWidth ?? (48 * size) / 1024;
+  const scaledStroke = strokeWidth ?? (56 * size) / 1024;
 
   useEffect(() => {
     if (animate) {
@@ -56,7 +56,7 @@ export default function OrganicCheck({
       <AnimatedPath
         d={CHECK_PATH}
         stroke={color}
-        strokeWidth={scaledStroke > 0 ? scaledStroke : 48}
+        strokeWidth={scaledStroke > 0 ? scaledStroke : 56}
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"
