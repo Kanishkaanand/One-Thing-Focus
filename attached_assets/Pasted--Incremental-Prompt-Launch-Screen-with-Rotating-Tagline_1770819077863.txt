@@ -1,0 +1,134 @@
+# Incremental Prompt — Launch Screen with Rotating Taglines
+
+Add a warm, animated launch/splash screen that shows the Sunrise logo and a randomly selected tagline each time the app opens. Do NOT restructure existing screens or logic.
+
+---
+
+## Launch Screen Design
+
+This screen appears every time the app opens, for approximately 2-2.5 seconds before transitioning to the Home Screen.
+
+### Layout
+```
+┌──────────────────────────────────┐
+│                                  │
+│                                  │
+│                                  │
+│                                  │
+│          [Sunrise Logo]          │
+│            120x120px             │
+│                                  │
+│           One Thing              │
+│                                  │
+│   "One thing. One day.           │
+│        That's enough."           │
+│                                  │
+│                                  │
+│                                  │
+│                                  │
+│                                  │
+└──────────────────────────────────┘
+```
+
+- **Background:** Warm cream (#FAF7F2) — same as app background, seamless feel
+- **Logo:** The Sunrise app icon, displayed at 120x120px, centered, with NO rounded corners (since it's inside the app, not on the home screen). Use the raw sunrise graphic — half sun, horizon line, rays — not the icon with rounded rect mask.
+- **App Name:** "One Thing" in heading font (Fraunces/Lora/Nunito), 28px, warm charcoal (#2D2A26), centered below the logo with 16px spacing
+- **Tagline:** Randomly selected from the pool below, displayed in body font (DM Sans/Plus Jakarta Sans), 16px, secondary color (#8A8580), centered below the app name with 12px spacing. Italic style.
+
+### Tagline Pool
+
+Randomly select ONE tagline per app launch. Do not repeat the same one consecutively — store the last shown index and exclude it from the next random selection.
+
+```typescript
+const taglines = [
+  "You don't need to do everything. Just one thing.",
+  "One thing. One day. That's enough.",
+  "Start with one. The rest can wait.",
+  "Less to do. More to feel proud of.",
+  "A single step is still a journey.",
+  "Do less. Feel better.",
+];
+```
+
+Store `lastTaglineIndex` in AsyncStorage to avoid back-to-back repeats.
+
+### Animation Sequence
+
+1. **0ms:** Screen appears with warm cream background only
+2. **200ms:** Logo fades in + gentle scale from 0.85 → 1.0 (ease-out, 500ms duration)
+3. **500ms:** App name "One Thing" fades in (300ms duration)
+4. **800ms:** Tagline fades in from below with slight upward movement (300ms duration)
+5. **2000ms:** Entire screen fades out (400ms duration) and transitions to Home Screen
+6. **2400ms:** Home Screen is fully visible
+
+Total duration: ~2.4 seconds. Should feel calm and unhurried — like a slow, comfortable breath.
+
+### Easing
+- All fade-ins: ease-out
+- Scale animation: cubic-bezier(0.25, 0.46, 0.45, 0.94) — gentle deceleration
+- Final fade-out: ease-in-out
+
+---
+
+## Technical Implementation
+
+- Use a custom splash/launch screen component that renders on top of the app
+- Use `Animated` API from React Native for the fade and scale sequences
+- After the animation completes, unmount the splash component and show the Home Screen
+- This is NOT the native iOS/Android static splash — it's an in-app animated splash that runs after the native one
+
+```typescript
+// Pseudocode structure
+const LaunchScreen = ({ onComplete }: { onComplete: () => void }) => {
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const logoScale = useRef(new Animated.Value(0.85)).current;
+  const nameOpacity = useRef(new Animated.Value(0)).current;
+  const taglineOpacity = useRef(new Animated.Value(0)).current;
+  const taglineTranslateY = useRef(new Animated.Value(10)).current;
+  const screenOpacity = useRef(new Animated.Value(1)).current;
+
+  const [tagline, setTagline] = useState('');
+
+  useEffect(() => {
+    // Pick random tagline (excluding last shown)
+    pickRandomTagline().then(setTagline);
+
+    // Run animation sequence
+    Animated.sequence([
+      Animated.delay(200),
+      Animated.parallel([
+        Animated.timing(logoOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.timing(logoScale, { toValue: 1, duration: 500, useNativeDriver: true }),
+      ]),
+      Animated.delay(100),
+      Animated.timing(nameOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+      Animated.delay(100),
+      Animated.parallel([
+        Animated.timing(taglineOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(taglineTranslateY, { toValue: 0, duration: 300, useNativeDriver: true }),
+      ]),
+      Animated.delay(1200),
+      Animated.timing(screenOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
+    ]).start(() => onComplete());
+  }, []);
+
+  return (
+    <Animated.View style={{ opacity: screenOpacity, /* full screen overlay styles */ }}>
+      <Animated.Image source={sunriseLogo} style={{ opacity: logoOpacity, transform: [{ scale: logoScale }] }} />
+      <Animated.Text style={{ opacity: nameOpacity }}>One Thing</Animated.Text>
+      <Animated.Text style={{ opacity: taglineOpacity, transform: [{ translateY: taglineTranslateY }] }}>
+        {tagline}
+      </Animated.Text>
+    </Animated.View>
+  );
+};
+```
+
+---
+
+## Edge Cases
+
+- **First ever launch:** Show launch screen, THEN transition to Onboarding (not Home Screen)
+- **Returning user:** Show launch screen, then transition to Home Screen
+- **Keep it skippable:** If user taps anywhere on the launch screen, skip remaining animation and transition immediately — respect impatient users
+- **No network needed:** Everything is local — taglines are hardcoded, logo is bundled
