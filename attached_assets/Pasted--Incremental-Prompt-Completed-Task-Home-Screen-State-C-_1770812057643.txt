@@ -1,0 +1,132 @@
+# Incremental Prompt — Completed Task Home Screen (State C)
+
+Update the Home Screen to handle the state when ALL tasks for the day are completed. This is the most emotionally important screen in the app — treat it with care. Do NOT restructure other screens or logic.
+
+---
+
+## When to Show This State
+
+Show this state on the Home Screen (Today tab) when:
+- All tasks for today have been marked complete with proof submitted
+- The user returns to the app at any point after completing their task(s)
+
+This state persists for the rest of the day until midnight reset.
+
+---
+
+## Visual Design
+
+### Card Transformation
+- The task card shifts from its active state into a calm, settled completion state
+- Card gets a soft sage green (#7DB07A) left border accent (4px)
+- Background stays white but with a very subtle warm glow/shadow
+- A gentle animated checkmark plays once (SVG stroke draw animation, ~600ms)
+- Proof thumbnail is visible on the card (small, tappable to view full size)
+- Task text stays visible but slightly muted — it's done, it's settled
+- Completed timestamp below task text: "Done at 3:42 PM" in secondary text color
+
+### Completion Message (Above the Card)
+Display ONE message randomly selected per day. Store the selected index in today's entry so it stays consistent if the user reopens the app multiple times.
+
+**Generic completion messages (default pool):**
+- "Done and dusted. The rest of the day is yours."
+- "One thing. Done. That's a win."
+- "You showed up today. That matters more than you think."
+- "Nothing left to do. How good does that feel?"
+- "Today's sorted. Go enjoy the rest of it."
+- "You said you'd do it, and you did. That's who you are."
+- "That's it. You're free. Go do something fun."
+- "Look at you, showing up for yourself."
+
+**Streak milestone messages (override generic on these days):**
+- Day 3: "Three days running. Something's clicking."
+- Day 5: "Five days in. This is becoming your thing."
+- Day 7: "A whole week. You've earned what comes next."
+- Day 10: "Ten days. Double digits. That's real momentum."
+- Day 14: "Two weeks of showing up. That's not luck — that's you."
+- Day 21: "Three weeks. You're not trying anymore — you just do this now."
+- Day 30: "30 days. You've built something real."
+- Day 50: "Fifty days. Most people never get here. You did."
+- Day 100: "One hundred days. That's not a streak — that's who you are."
+
+**Level up messages (override everything on level-up day):**
+- Level 1 → 2: "You've unlocked 2 tasks per day. You earned this."
+- Level 2 → 3: "Three tasks per day. Look how far you've come."
+
+Style the message in the heading font (Fraunces/Lora/Nunito), larger size (~20-22px), warm charcoal color, centered above the card. Fade it in with a 300ms delay after the checkmark animation completes.
+
+### Reflection Summary (Below the Card)
+After proof and reflection are submitted, show a quiet journal-style entry below the task card:
+
+```
+┌──────────────────────────────────────┐
+│  ✅  "Finish the proposal draft"     │
+│      Done at 3:42 PM                 │
+│      [proof thumbnail]               │
+└──────────────────────────────────────┘
+
+   😌 Calm
+   "Felt good to focus on just this one thing"
+```
+
+- Mood emoji displayed at regular size with the label next to it
+- Reflection note in italics, secondary text color
+- If no reflection note was written, just show the mood emoji — no "No note added" placeholder
+- This section should feel like a peaceful journal entry, not a data display
+
+### The Empty Space Below — Intentional
+
+**CRITICAL DESIGN DECISION:**
+
+After the completed card and reflection, the rest of the screen should be intentionally empty. Do NOT add:
+- ❌ "Add another task" buttons
+- ❌ Suggestions or tips
+- ❌ Links to other features
+- ❌ Motivational quotes beyond the single message above
+- ❌ Any engagement hooks whatsoever
+
+The emptiness IS the reward. The app is saying: "You're done. Go live your life."
+
+At the very bottom of the screen, one soft line of text, centered, in secondary color:
+
+*"See you tomorrow ✨"*
+
+---
+
+## Animation Sequence on First View
+
+When the user first sees this state after completing their task (right after the celebration animation from the completion flow), play this sequence:
+
+1. **0ms:** Screen transitions to State C layout
+2. **0-600ms:** Checkmark draws on the card (SVG stroke animation)
+3. **300ms:** Card border fades to sage green
+4. **600ms:** Soft radial pulse on the checkmark (one pulse, not repeating)
+5. **900ms:** Completion message fades in above the card
+6. **1200ms:** Reflection summary fades in below the card
+7. **1500ms:** "See you tomorrow ✨" fades in at the bottom
+
+Total sequence: ~1.5 seconds. Should feel unhurried and satisfying.
+
+On subsequent app opens the same day, skip the animation — show everything already in place, no re-animation.
+
+---
+
+## Data Tracking
+
+Add a field to DailyEntry to persist the selected message:
+
+```typescript
+// Add to existing DailyEntry interface
+completionMessageIndex?: number; // index of the randomly selected message, persisted so it stays consistent across app reopens
+```
+
+---
+
+## Edge Case: Multiple Tasks (Level 2 or 3)
+
+If the user is at Level 2 or 3 and has completed SOME but not all tasks:
+- Do NOT show State C
+- Stay in State B (active task view)
+- Completed tasks show with a subtle checkmark and muted styling
+- Remaining tasks stay active with "Mark Complete" button
+- Only transition to State C when ALL tasks for the day are done
