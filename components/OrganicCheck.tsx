@@ -62,15 +62,14 @@ export default function OrganicCheck({
           cx={512}
           cy={512}
           r={440}
-          stroke={color}
-          strokeWidth={circleStroke}
-          fill="none"
-          opacity={0.25}
+          stroke="none"
+          strokeWidth={0}
+          fill={color}
         />
       )}
       <AnimatedPath
         d={CHECK_PATH}
-        stroke={color}
+        stroke={showCircle ? '#FFFFFF' : color}
         strokeWidth={scaledStroke > 0 ? scaledStroke : 80}
         strokeLinecap="round"
         strokeLinejoin="round"
