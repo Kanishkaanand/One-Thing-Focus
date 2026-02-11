@@ -11,6 +11,7 @@ import {
   generateId,
   processEndOfDay,
 } from './storage';
+import { syncNotifications, rescheduleAllReminders } from './notifications';
 
 interface AppContextValue {
   profile: UserProfile | null;
@@ -59,7 +60,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setEntries(allEntries);
 
       const today = getTodayDate();
-      setTodayEntry(allEntries[today] || null);
+      const currentTodayEntry = allEntries[today] || null;
+      setTodayEntry(currentTodayEntry);
+
+      await syncNotifications(prof, currentTodayEntry);
     } catch (e) {
       console.error('Failed to load data:', e);
     } finally {
@@ -103,6 +107,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await saveEntry(updated);
     setTodayEntry(updated);
     setEntries(prev => ({ ...prev, [today]: updated }));
+
+    await syncNotifications(profile, updated);
   }, [profile, todayEntry]);
 
   const completeTask = useCallback(async (taskId: string, proof?: TaskItem['proof']) => {
@@ -143,6 +149,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setTodayEntry(updated);
     setProfile(newProfile);
     setEntries(prev => ({ ...prev, [todayEntry.date]: updated }));
+
+    await syncNotifications(newProfile, updated);
   }, [todayEntry, profile]);
 
   const addReflection = useCallback(async (mood: 'energized' | 'calm' | 'neutral' | 'tough', note?: string) => {
