@@ -64,3 +64,4 @@ constants/
 - Fixed day-detail bottom sheet: changed from formSheet to modal presentation for cross-platform compatibility
 - Added level upgrade/downgrade context info card in profile screen
 - Added proof submission toast with encouraging message before celebration
+- Added animated launch screen with sunrise logo and rotating taglines (tappable to skip)
