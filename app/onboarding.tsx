@@ -325,7 +325,11 @@ export default function OnboardingScreen() {
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        scrollEnabled={false}
+        scrollEnabled={true}
+        onMomentumScrollEnd={(e) => {
+          const index = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+          setCurrentIndex(index);
+        }}
         renderItem={({ item, index }) => <SlideItem item={item} index={index} />}
         keyExtractor={item => item.key}
         getItemLayout={(_, index) => ({

@@ -262,6 +262,21 @@ export default function ProfileScreen() {
           </View>
         </Animated.View>
 
+        <Animated.View entering={FadeInDown.delay(170)} style={styles.levelInfoCard}>
+          <View style={styles.levelInfoRow}>
+            <Feather name="arrow-up-circle" size={16} color={Colors.success} />
+            <Text style={styles.levelInfoText}>
+              Complete all tasks for 7 days in a row to level up
+            </Text>
+          </View>
+          <View style={styles.levelInfoRow}>
+            <Feather name="arrow-down-circle" size={16} color={Colors.textSecondary} />
+            <Text style={styles.levelInfoText}>
+              Miss a day and your streak resets — but your level only drops after 3 missed days
+            </Text>
+          </View>
+        </Animated.View>
+
         <View style={styles.statsGrid}>
           <StatCard icon="zap" label="Current Streak" value={profile.currentLevelStreak} delay={200} />
           <StatCard icon="trending-up" label="Longest Streak" value={profile.longestStreak} delay={250} />
@@ -746,5 +761,24 @@ const styles = StyleSheet.create({
     fontFamily: 'DMSans_500Medium',
     fontSize: 15,
     color: Colors.textSecondary,
+  },
+  levelInfoCard: {
+    backgroundColor: Colors.inputBg,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 20,
+    gap: 12,
+  },
+  levelInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  levelInfoText: {
+    fontFamily: 'DMSans_400Regular',
+    fontSize: 13,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+    flex: 1,
   },
 });

@@ -121,7 +121,12 @@ export default function CalendarScreen() {
             <Text style={styles.monthTitle}>
               {MONTHS[viewMonth]} {viewYear}
             </Text>
-            <Pressable onPress={nextMonth} hitSlop={12}>
+            <Pressable
+              onPress={nextMonth}
+              hitSlop={12}
+              disabled={viewYear === now.getFullYear() && viewMonth === now.getMonth()}
+              style={{ opacity: (viewYear === now.getFullYear() && viewMonth === now.getMonth()) ? 0.3 : 1 }}
+            >
               <Feather name="chevron-right" size={22} color={Colors.textSecondary} />
             </Pressable>
           </View>
