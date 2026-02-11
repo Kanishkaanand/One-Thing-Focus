@@ -1,0 +1,263 @@
+# Replit Prompt — "One Thing" App
+
+## Overview
+
+Build a mobile-first React Native (Expo) app called **"One Thing"** — a minimalist daily task commitment app that fights overwhelm by letting users focus on just one task per day. The app uses progressive unlocking (earn the right to add more tasks) and gentle encouragement to build consistency without guilt.
+
+**Tech Stack:** React Native with Expo, TypeScript, Expo Router for navigation, AsyncStorage for local persistence, and a clean component architecture. No backend needed for v1 — everything is local-first.
+
+---
+
+## Design Direction
+
+### Aesthetic: Warm Minimalism meets Calm Technology
+
+This app should feel like a **deep breath** — not another noisy productivity tool. Think: the calmness of a Muji store meets the warmth of a handwritten note.
+
+### Design Principles
+- **Ultra-light UI.** Lots of whitespace. No clutter. Every screen should feel like it has room to breathe.
+- **Warm, not cold.** Avoid sterile grays and blues. Use warm neutrals (soft cream, warm stone, muted terracotta) with one accent color (a soft golden amber or warm coral).
+- **Gentle motion.** Subtle fade-ins, soft spring animations on task cards, smooth transitions between screens. Nothing aggressive or bouncy — think slow inhale/exhale rhythm.
+- **Typography-led.** Use a distinctive serif or soft rounded font for headings (like "Fraunces", "Lora", or "Nunito") paired with a clean sans-serif body font (like "DM Sans" or "Plus Jakarta Sans"). The heading font should feel friendly and human, not corporate.
+- **No harsh reds or failure states.** Even "missed" days should feel gentle — use muted tones, never alarming colors.
+- **Micro-celebrations.** When a task is completed, show a delightful but subtle animation — a gentle confetti of dots, a soft glow, or a satisfying checkmark animation. Make completion feel rewarding without being childish.
+
+### Color Palette
+```
+Background:     #FAF7F2 (warm cream)
+Surface/Cards:  #FFFFFF with subtle warm shadow
+Text Primary:   #2D2A26 (warm charcoal)
+Text Secondary: #8A8580 (warm gray)
+Accent:         #E8913A (golden amber) — used sparingly for CTAs, streaks, highlights
+Success:        #7DB07A (soft sage green)
+Neutral/Rest:   #D9D4CE (warm stone) — for empty/missed days
+Streak Glow:    #F5C563 (soft gold)
+```
+
+### Iconography
+Use simple line icons (Lucide or Phosphor icon set). Keep them thin and elegant. No filled/heavy icons.
+
+---
+
+## App Structure & Screens
+
+### 1. Onboarding (First Launch Only)
+
+3 simple swipeable screens with illustrations or minimal animations:
+
+**Screen 1:** "Feeling overwhelmed?" — A visual of scattered tasks/chaos.
+**Screen 2:** "What if you just did one thing today?" — Visual simplifies to a single glowing circle.
+**Screen 3:** "Start small. Build momentum. One thing at a time." — CTA button: "Let's Begin"
+
+After onboarding, ask for the user's name (single input, optional) so we can personalize greetings.
+
+### 2. Home Screen (Daily Task View) — Primary Screen
+
+This is where users spend 90% of their time. It should be beautifully simple.
+
+**Top Section:**
+- Warm greeting: "Good morning, [Name]" (time-aware: morning/afternoon/evening)
+- Current date in a friendly format: "Tuesday, 11 February"
+- Current level indicator shown subtly: "Level 1 · Day 3 of 7" with a minimal progress bar or dots
+
+**Center Section (The Task Area):**
+
+*If no task is set for today:*
+- A large, inviting empty state with soft placeholder text: "What's your one thing today?"
+- A prominent but elegant text input or tap-to-add area
+- Keep it feeling like an invitation, not an obligation
+
+*If task(s) are set:*
+- Each task displayed as a clean card with:
+  - Task text (large, readable)
+  - A "Mark Complete" button that expands to show proof upload options
+  - Subtle time stamp of when it was added
+
+*If task is completed:*
+- Card transforms to show completion state with soft green accent
+- Proof thumbnail visible
+- Mood/reflection prompt appears below (see Reflection section)
+- Gentle celebration animation on first completion
+
+**Bottom Section:**
+- Minimal tab bar with 3 items: **Today** (home icon) | **Calendar** (calendar icon) | **Profile** (user icon)
+
+### 3. Task Completion Flow
+
+When user taps "Mark Complete":
+
+**Step 1 — Proof Upload:**
+- Bottom sheet slides up with options: "Take Photo", "Upload Screenshot", "Upload Document"
+- Clean file picker / camera integration
+- Proof thumbnail preview before submission
+- "Submit" button
+
+**Step 2 — Reflection (immediately after proof submission):**
+- Smooth transition to a reflection moment
+- "How did today feel?" with 4 mood options displayed as soft, tappable circles:
+  - 🔥 Energized
+  - 😌 Calm
+  - 😐 Neutral
+  - 😤 Tough
+- Optional one-line text input below: "Anything to remember?" (placeholder text, not required)
+- "Done" button to save
+
+**Step 3 — Celebration:**
+- Brief, delightful animation (subtle particle effect or gentle pulse)
+- Encouraging message: "That's [X] days in a row. You're building something great."
+- If user just leveled up: special animation + message: "You've unlocked 2 tasks per day! 🎉"
+
+### 4. Calendar View (Look Back)
+
+A monthly calendar grid showing the user's history at a glance.
+
+**Calendar Grid:**
+- Each day cell shows a visual indicator:
+  - ✅ Completed day: Filled circle in accent/success color
+  - ⬜ Missed day: Soft neutral dot (NOT red, NOT empty — normalize it)
+  - 🔵 Today: Highlighted ring
+  - Future days: Empty/muted
+- Current streak count displayed prominently above calendar: "🔥 12 day streak"
+
+**Day Detail (on tap):**
+- Tapping any past date opens a detail card/bottom sheet showing:
+  - The task(s) for that day
+  - Proof thumbnail(s) — tappable to view full size
+  - Mood emoji selected
+  - Reflection note (if any)
+  - Soft timestamp
+
+**Weekly Insight Banner (optional nice-to-have):**
+- At the top of calendar view, a subtle card: "Last week: 5/7 days completed. You felt energized most days."
+
+### 5. Profile Screen
+
+Clean, minimal profile with:
+
+- User name (editable)
+- **Stats section:**
+  - Current Level (1, 2, or 3) with visual indicator
+  - Current Streak count
+  - Longest Streak
+  - Total Tasks Completed
+  - Completion Rate (%)
+- **Reminder Settings:**
+  - Toggle for daily reminder notification
+  - Time picker for reminder time
+- **About section:**
+  - App version
+  - "Made with ❤️" credit line
+
+---
+
+## Core Logic & Data Model
+
+### Level System
+
+```
+Level 1: 1 task per day (starting level)
+Level 2: 2 tasks per day (unlocked after 7 consecutive completed days at Level 1)
+Level 3: 3 tasks per day (unlocked after 7 consecutive completed days at Level 2)
+```
+
+**Upgrade Rule:** Complete ALL tasks for 7 consecutive days at current level → level up.
+
+**Downgrade Rule:** If at Level 2 or 3 and user misses completing all tasks for a day → downgrade to previous level. Streak for current level resets to 0.
+
+**Important:** Level 1 users do NOT get downgraded — they just lose their streak. We never punish beginners.
+
+### Data Model (AsyncStorage)
+
+```typescript
+// User Profile
+interface UserProfile {
+  name: string;
+  createdAt: string; // ISO date
+  currentLevel: 1 | 2 | 3;
+  currentLevelStreak: number; // consecutive days completed at current level
+  longestStreak: number;
+  totalTasksCompleted: number;
+  reminderEnabled: boolean;
+  reminderTime: string; // "09:00"
+}
+
+// Daily Entry
+interface DailyEntry {
+  date: string; // "2026-02-11"
+  tasks: TaskItem[];
+  reflection?: {
+    mood: 'energized' | 'calm' | 'neutral' | 'tough';
+    note?: string;
+  };
+  completed: boolean; // all tasks done
+  levelAtTime: 1 | 2 | 3;
+}
+
+// Individual Task
+interface TaskItem {
+  id: string;
+  text: string;
+  createdAt: string;
+  completedAt?: string;
+  proof?: {
+    type: 'photo' | 'screenshot' | 'document';
+    uri: string;
+  };
+  isCompleted: boolean;
+}
+```
+
+### End of Day Logic
+
+If the day ends and tasks are not completed:
+- Do NOT show any negative messaging
+- Next morning, greet the user warmly and show:
+  > "Yesterday didn't go as planned — that's completely okay. Every day is a fresh start. What's your one thing today?"
+- If the user was at Level 2 or 3, show the downgrade gently:
+  > "You're back to [X] task(s) per day. No pressure — just focus on showing up."
+- The missed day appears in calendar with a neutral/soft indicator, NOT a failure mark
+
+---
+
+## Interaction & Animation Details
+
+- **Page transitions:** Smooth horizontal slide for tab navigation, vertical slide-up for bottom sheets
+- **Task card entry:** Fade in + slight upward float when task is added
+- **Completion animation:** Satisfying checkmark draw animation (SVG animated stroke) + soft radial pulse
+- **Level up:** Golden shimmer effect across the screen + congratulatory message with spring animation
+- **Streak counter:** Gentle number flip animation when streak increments
+- **Pull to refresh:** Custom animation — a small sun rising (matching warm theme)
+- **Empty states:** Always have friendly, encouraging copy — never leave a screen feeling barren
+
+---
+
+## Copy & Tone of Voice
+
+The app's written voice should be: **warm, encouraging, and human.** Like a supportive friend, not a drill sergeant.
+
+- Never say: "You failed", "Missed", "Incomplete", "0 tasks done"
+- Instead say: "Rest day", "Tomorrow's a fresh start", "Take it easy"
+- Streak messages should build excitement without pressure:
+  - Day 1: "And so it begins."
+  - Day 3: "Three days strong. You're finding your rhythm."
+  - Day 7: "A whole week! You've earned this."
+  - Day 14: "Two weeks of showing up. That's not luck — that's you."
+  - Day 30: "30 days. You've built something real."
+
+---
+
+## What NOT to Build
+
+- No social features in v1 (accountability partners come later)
+- No backend/auth — purely local storage
+- No push notification service — just local notifications
+- No task categories or tags — keep it text only
+- No task editing after completion — what's done is done
+- No analytics dashboard — keep it to the simple stats on profile
+- No dark mode in v1 — ship the warm light theme first
+
+---
+
+## Summary
+
+This app should feel like the anti-productivity-app. Where others add complexity, this removes it. Where others track everything, this focuses on one thing. The UX should make someone feel *lighter* after opening it, not heavier. Every pixel, every word, every animation should reinforce the message: **"You don't need to do everything. Just do one thing. That's enough."**
