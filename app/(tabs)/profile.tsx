@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ScrollView,
   Platform,
   Switch,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
@@ -15,7 +16,16 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/lib/AppContext';
-import { calculateCompletionRate } from '@/lib/storage';
+import { calculateCompletionRate, formatTime12h } from '@/lib/storage';
+import {
+  getNotificationPermissionStatus,
+  requestNotificationPermissions,
+  openNotificationSettings,
+  rescheduleAllReminders,
+} from '@/lib/notifications';
+
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
+const MINUTES = [0, 15, 30, 45];
 
 function StatCard({ icon, label, value, delay }: { icon: string; label: string; value: string | number; delay: number }) {
   return (
@@ -29,11 +39,104 @@ function StatCard({ icon, label, value, delay }: { icon: string; label: string; 
   );
 }
 
+function TimePicker({
+  visible,
+  value,
+  onClose,
+  onSelect,
+}: {
+  visible: boolean;
+  value: string;
+  onClose: () => void;
+  onSelect: (time: string) => void;
+}) {
+  const [h, m] = value.split(':').map(Number);
+  const [selectedHour, setSelectedHour] = useState(h);
+  const [selectedMinute, setSelectedMinute] = useState(m);
+
+  useEffect(() => {
+    if (visible) {
+      const [hh, mm] = value.split(':').map(Number);
+      setSelectedHour(hh);
+      setSelectedMinute(mm);
+    }
+  }, [visible, value]);
+
+  const handleDone = () => {
+    const timeStr = `${String(selectedHour).padStart(2, '0')}:${String(selectedMinute).padStart(2, '0')}`;
+    onSelect(timeStr);
+    onClose();
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <Pressable style={styles.pickerOverlay} onPress={onClose}>
+        <Pressable style={styles.pickerSheet} onPress={e => e.stopPropagation()}>
+          <View style={styles.pickerHandle} />
+          <Text style={styles.pickerTitle}>Set Time</Text>
+
+          <View style={styles.pickerColumns}>
+            <ScrollView
+              style={styles.pickerColumn}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.pickerColumnContent}
+            >
+              {HOURS.map(hour => (
+                <Pressable
+                  key={hour}
+                  onPress={() => setSelectedHour(hour)}
+                  style={[styles.pickerOption, selectedHour === hour && styles.pickerOptionSelected]}
+                >
+                  <Text style={[styles.pickerOptionText, selectedHour === hour && styles.pickerOptionTextSelected]}>
+                    {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            <ScrollView
+              style={styles.pickerColumn}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.pickerColumnContent}
+            >
+              {MINUTES.map(minute => (
+                <Pressable
+                  key={minute}
+                  onPress={() => setSelectedMinute(minute)}
+                  style={[styles.pickerOption, selectedMinute === minute && styles.pickerOptionSelected]}
+                >
+                  <Text style={[styles.pickerOptionText, selectedMinute === minute && styles.pickerOptionTextSelected]}>
+                    :{String(minute).padStart(2, '0')}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+
+          <Pressable style={styles.pickerDoneBtn} onPress={handleDone}>
+            <Text style={styles.pickerDoneBtnText}>Done</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { profile, entries, updateProfile, isLoading } = useApp();
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
+  const [notifStatus, setNotifStatus] = useState<{ granted: boolean; canAskAgain: boolean }>({ granted: true, canAskAgain: true });
+  const [timePickerTarget, setTimePickerTarget] = useState<'pick' | 'complete' | null>(null);
+
+  useEffect(() => {
+    checkNotifStatus();
+  }, []);
+
+  const checkNotifStatus = async () => {
+    const status = await getNotificationPermissionStatus();
+    setNotifStatus(status);
+  };
 
   if (isLoading || !profile) return <View style={[styles.container, { paddingTop: insets.top }]} />;
 
@@ -51,12 +154,56 @@ export default function ProfileScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
-  const handleToggleReminder = async (value: boolean) => {
+  const handleTogglePickReminder = async (value: boolean) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await updateProfile({ reminderEnabled: value });
+
+    if (value && !notifStatus.granted) {
+      const granted = await requestNotificationPermissions();
+      if (!granted) {
+        return;
+      }
+      setNotifStatus({ granted: true, canAskAgain: true });
+    }
+
+    const updated = { ...profile.reminderPickTask, enabled: value };
+    await updateProfile({ reminderPickTask: updated });
+    const newProfile = { ...profile, reminderPickTask: updated };
+    await rescheduleAllReminders(newProfile);
+  };
+
+  const handleToggleCompleteReminder = async (value: boolean) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    if (value && !notifStatus.granted) {
+      const granted = await requestNotificationPermissions();
+      if (!granted) {
+        return;
+      }
+      setNotifStatus({ granted: true, canAskAgain: true });
+    }
+
+    const updated = { ...profile.reminderCompleteTask, enabled: value };
+    await updateProfile({ reminderCompleteTask: updated });
+    const newProfile = { ...profile, reminderCompleteTask: updated };
+    await rescheduleAllReminders(newProfile);
+  };
+
+  const handleTimeSelect = async (time: string) => {
+    if (timePickerTarget === 'pick') {
+      const updated = { ...profile.reminderPickTask, time };
+      await updateProfile({ reminderPickTask: updated });
+      const newProfile = { ...profile, reminderPickTask: updated };
+      await rescheduleAllReminders(newProfile);
+    } else if (timePickerTarget === 'complete') {
+      const updated = { ...profile.reminderCompleteTask, time };
+      await updateProfile({ reminderCompleteTask: updated });
+      const newProfile = { ...profile, reminderCompleteTask: updated };
+      await rescheduleAllReminders(newProfile);
+    }
   };
 
   const webTopInset = Platform.OS === 'web' ? 67 : 0;
+  const showNotifWarning = Platform.OS !== 'web' && !notifStatus.granted && !notifStatus.canAskAgain;
 
   return (
     <View style={styles.container}>
@@ -119,30 +266,59 @@ export default function ProfileScreen() {
         </View>
 
         <Animated.View entering={FadeInDown.delay(400)} style={styles.settingsSection}>
-          <Text style={styles.sectionTitle}>Settings</Text>
+          <Text style={styles.sectionTitle}>Reminders</Text>
+
+          {showNotifWarning && (
+            <View style={styles.notifWarning}>
+              <Text style={styles.notifWarningText}>
+                Notifications are turned off in your phone settings
+              </Text>
+              <Pressable onPress={openNotificationSettings} style={styles.notifWarningLink}>
+                <Text style={styles.notifWarningLinkText}>Open Settings</Text>
+                <Feather name="external-link" size={12} color={Colors.accent} />
+              </Pressable>
+            </View>
+          )}
 
           <View style={styles.settingRow}>
             <View style={styles.settingLeft}>
-              <Feather name="bell" size={18} color={Colors.textSecondary} />
-              <Text style={styles.settingText}>Daily Reminder</Text>
+              <Feather name="sunrise" size={18} color={Colors.textSecondary} />
+              <Text style={styles.settingText}>Pick your task</Text>
             </View>
-            <Switch
-              value={profile.reminderEnabled}
-              onValueChange={handleToggleReminder}
-              trackColor={{ false: Colors.neutral, true: Colors.accent + '60' }}
-              thumbColor={profile.reminderEnabled ? Colors.accent : Colors.surface}
-            />
+            <View style={styles.settingRight}>
+              {profile.reminderPickTask.enabled && (
+                <Pressable onPress={() => setTimePickerTarget('pick')} style={styles.settingTimeChip}>
+                  <Text style={styles.settingTimeText}>{formatTime12h(profile.reminderPickTask.time)}</Text>
+                </Pressable>
+              )}
+              <Switch
+                value={profile.reminderPickTask.enabled}
+                onValueChange={handleTogglePickReminder}
+                trackColor={{ false: Colors.neutral, true: Colors.accent + '60' }}
+                thumbColor={profile.reminderPickTask.enabled ? Colors.accent : Colors.surface}
+              />
+            </View>
           </View>
 
-          {profile.reminderEnabled && (
-            <View style={styles.settingRow}>
-              <View style={styles.settingLeft}>
-                <Feather name="clock" size={18} color={Colors.textSecondary} />
-                <Text style={styles.settingText}>Reminder Time</Text>
-              </View>
-              <Text style={styles.settingValue}>{profile.reminderTime}</Text>
+          <View style={styles.settingRow}>
+            <View style={styles.settingLeft}>
+              <Feather name="sunset" size={18} color={Colors.textSecondary} />
+              <Text style={styles.settingText}>Complete your task</Text>
             </View>
-          )}
+            <View style={styles.settingRight}>
+              {profile.reminderCompleteTask.enabled && (
+                <Pressable onPress={() => setTimePickerTarget('complete')} style={styles.settingTimeChip}>
+                  <Text style={styles.settingTimeText}>{formatTime12h(profile.reminderCompleteTask.time)}</Text>
+                </Pressable>
+              )}
+              <Switch
+                value={profile.reminderCompleteTask.enabled}
+                onValueChange={handleToggleCompleteReminder}
+                trackColor={{ false: Colors.neutral, true: Colors.accent + '60' }}
+                thumbColor={profile.reminderCompleteTask.enabled ? Colors.accent : Colors.surface}
+              />
+            </View>
+          </View>
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(500)} style={styles.aboutSection}>
@@ -151,6 +327,19 @@ export default function ProfileScreen() {
           <Text style={styles.aboutCredit}>Made with care</Text>
         </Animated.View>
       </ScrollView>
+
+      <TimePicker
+        visible={timePickerTarget !== null}
+        value={
+          timePickerTarget === 'pick'
+            ? profile.reminderPickTask.time
+            : timePickerTarget === 'complete'
+            ? profile.reminderCompleteTask.time
+            : '08:00'
+        }
+        onClose={() => setTimePickerTarget(null)}
+        onSelect={handleTimeSelect}
+      />
     </View>
   );
 }
@@ -305,15 +494,50 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    flex: 1,
+  },
+  settingRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   settingText: {
     fontFamily: 'DMSans_500Medium',
     fontSize: 15,
     color: Colors.textPrimary,
   },
-  settingValue: {
+  settingTimeChip: {
+    backgroundColor: Colors.accentLight,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  settingTimeText: {
+    fontFamily: 'DMSans_600SemiBold',
+    fontSize: 13,
+    color: Colors.accent,
+  },
+  notifWarning: {
+    backgroundColor: Colors.inputBg,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    gap: 6,
+  },
+  notifWarningText: {
+    fontFamily: 'DMSans_400Regular',
+    fontSize: 13,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+  },
+  notifWarningLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  notifWarningLinkText: {
     fontFamily: 'DMSans_500Medium',
-    fontSize: 15,
+    fontSize: 13,
     color: Colors.accent,
   },
   aboutSection: {
@@ -329,5 +553,76 @@ const styles = StyleSheet.create({
     fontFamily: 'DMSans_400Regular',
     fontSize: 13,
     color: Colors.neutral,
+  },
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'flex-end',
+  },
+  pickerSheet: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    paddingTop: 12,
+  },
+  pickerHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.neutral,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  pickerTitle: {
+    fontFamily: 'Nunito_700Bold',
+    fontSize: 20,
+    color: Colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  pickerColumns: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    marginBottom: 24,
+  },
+  pickerColumn: {
+    maxHeight: 200,
+    width: 90,
+  },
+  pickerColumnContent: {
+    paddingVertical: 8,
+  },
+  pickerOption: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  pickerOptionSelected: {
+    backgroundColor: Colors.accentLight,
+  },
+  pickerOptionText: {
+    fontFamily: 'DMSans_400Regular',
+    fontSize: 16,
+    color: Colors.textSecondary,
+  },
+  pickerOptionTextSelected: {
+    fontFamily: 'DMSans_600SemiBold',
+    color: Colors.accent,
+  },
+  pickerDoneBtn: {
+    backgroundColor: Colors.accent,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  pickerDoneBtnText: {
+    fontFamily: 'Nunito_600SemiBold',
+    fontSize: 16,
+    color: '#FFF',
   },
 });
