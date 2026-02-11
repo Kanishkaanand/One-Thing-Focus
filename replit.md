@@ -40,8 +40,10 @@ constants/
 - Gentle downgrade for missed days (never punishes beginners)
 - Proof upload for task completion
 - Mood reflection after completing all tasks
+- Completed state (State C): calm completion screen with sage green card accent, animated checkmark, contextual messages (generic/streak/level-up), journal-style reflection, intentional empty space, "See you tomorrow" footer
 - Calendar view with day detail sheets
 - Streak tracking with encouraging messages
+- Dual-reminder notification system (pick task + complete task)
 
 ## Design
 - Warm minimalist aesthetic (cream background, golden amber accent)
@@ -51,3 +53,5 @@ constants/
 
 ## Recent Changes
 - Initial build: Full app implementation with onboarding, home, calendar, profile screens
+- Added dual-reminder notification system with state-aware scheduling
+- Added completed state (State C) for home screen with animated checkmark, contextual completion messages, journal-style reflection, and "See you tomorrow" footer
