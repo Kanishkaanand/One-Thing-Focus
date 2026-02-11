@@ -5,6 +5,7 @@ import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import Colors from "@/constants/colors";
 import { queryClient } from "@/lib/query-client";
 import { AppProvider } from "@/lib/AppContext";
 import { StatusBar } from "expo-status-bar";
@@ -31,11 +32,11 @@ function RootLayoutNav() {
       <Stack.Screen
         name="day-detail"
         options={{
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.6, 0.9],
-          sheetGrabberVisible: true,
-          headerShown: false,
-          contentStyle: { backgroundColor: 'transparent' },
+          presentation: "modal",
+          headerShown: true,
+          headerTitle: "",
+          headerStyle: { backgroundColor: Colors.surface },
+          headerShadowVisible: false,
         }}
       />
       <Stack.Screen name="+not-found" />
