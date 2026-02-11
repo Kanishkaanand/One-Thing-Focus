@@ -40,6 +40,8 @@ export interface DailyEntry {
   };
   completed: boolean;
   levelAtTime: 1 | 2 | 3;
+  completionMessageIndex?: number;
+  completionAnimationSeen?: boolean;
 }
 
 const PROFILE_KEY = '@onething_profile';
