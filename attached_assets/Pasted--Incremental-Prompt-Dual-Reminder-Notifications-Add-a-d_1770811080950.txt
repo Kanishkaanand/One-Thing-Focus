@@ -1,0 +1,150 @@
+# Incremental Prompt — Dual Reminder Notifications
+
+Add a dual-reminder system with push notifications. This builds on top of the existing app — do NOT restructure existing screens or logic.
+
+---
+
+## 1. Two Reminder Types
+
+Add two independent, user-configurable reminders:
+
+### Reminder 1: "Pick Your Task" (Morning Reminder)
+- **Purpose:** Reminds the user to open the app and set their task for the day
+- **Default time:** 8:00 AM
+- **Trigger condition:** Fires ONLY if no task has been created for today
+- **Notification copy (rotate randomly):**
+  - "Good morning! What's your one thing today?"
+  - "A new day, a fresh start. Ready to pick your one thing?"
+  - "Your day is wide open. What one thing will make it count?"
+  - "Hey [Name], one task is all it takes. What will it be?"
+- **Tap action:** Opens app directly to the home screen (State A — empty task input)
+
+### Reminder 2: "Finish Your Task" (Completion Nudge)
+- **Purpose:** Reminds the user to complete and submit proof for their task
+- **Default time:** 6:00 PM
+- **Trigger condition:** Fires ONLY if a task exists for today AND is not yet marked complete
+- **Notification copy (rotate randomly):**
+  - "Your one thing is waiting. You've got this."
+  - "Still time to finish today's task. Just one thing, remember?"
+  - "Hey [Name], don't forget — you committed to one thing today."
+  - "Almost end of day — your task is still open. Wrap it up?"
+- **Tap action:** Opens app directly to the home screen (State B — active task view)
+
+### Technical Implementation
+- Use `expo-notifications` for local scheduled notifications
+- Schedule both reminders daily using `Notifications.scheduleNotificationAsync` with a daily repeat trigger
+- On app launch each day, check task state and cancel irrelevant notifications:
+  - If task already created → cancel Reminder 1 for today
+  - If task already completed → cancel both reminders for today
+- Re-schedule notifications whenever user changes reminder times
+- Request notification permissions during onboarding or first reminder setup
+
+---
+
+## 2. Profile Settings — Reminder Configuration
+
+Update the Profile screen to include a **Reminders section** between Stats and About:
+
+```
+── Reminders ──────────────────────────────
+
+Pick your task       [toggle]    [9:00 AM]
+Complete your task   [toggle]    [6:00 PM]
+
+────────────────────────────────────────────
+```
+
+- Each reminder has an independent ON/OFF toggle and a time picker
+- Time picker: Use a clean scroll wheel or bottom-sheet time picker matching the app's warm aesthetic
+- Persist all settings in AsyncStorage under the UserProfile object
+- Add these fields to UserProfile:
+
+```typescript
+// Add to existing UserProfile interface
+reminderPickTask: {
+  enabled: boolean;
+  time: string; // "08:00" — 24hr format
+};
+reminderCompleteTask: {
+  enabled: boolean;
+  time: string; // "18:00"
+};
+```
+
+---
+
+## 3. Notification Permission Flow
+
+### During Onboarding (after name input)
+Show a dedicated reminder setup screen:
+
+```
+┌─────────────────────────────────────┐
+│                                     │
+│   Stay on track, gently.            │
+│                                     │
+│   We'll send you two quiet nudges   │
+│   each day — one to pick your       │
+│   task, one to finish it.           │
+│                                     │
+│   Pick your task     [8:00 AM]  ⏱  │
+│   Finish your task   [6:00 PM]  ⏱  │
+│                                     │
+│   [ Enable Reminders ]              │
+│                                     │
+│   Skip for now                      │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+- "Enable Reminders" triggers the OS notification permission dialog
+- If user grants permission → schedule both reminders, save preferences
+- If user denies → save preferences with toggles off, show a subtle note: "You can turn these on anytime in your profile"
+- "Skip for now" → all reminders default to OFF
+
+### Smart Cancellation Logic
+Run this check every time the app opens and on every task state change:
+
+```typescript
+const syncNotifications = async (todayEntry: DailyEntry | null) => {
+  // No task created yet → Reminder 1 stays, cancel Reminder 2
+  if (!todayEntry || todayEntry.tasks.length === 0) {
+    // Keep "Pick your task" reminder active
+    // Cancel "Complete your task" reminder for today
+    return;
+  }
+
+  // Task created but not complete → Cancel Reminder 1, keep Reminder 2
+  if (!todayEntry.completed) {
+    // Cancel "Pick your task" — they already picked
+    // Keep "Complete your task" reminder active
+    return;
+  }
+
+  // All tasks complete → Cancel both reminders for today
+  // Cancel both reminders
+};
+```
+
+---
+
+## 4. Edge Cases to Handle
+
+- **User completes task after completion reminder fires:** That's fine — the reminder already went out. No harm done. Next day it recalculates.
+- **User hasn't created a task all day:** Only "Pick Your Task" reminder fires. No completion reminder. In calendar, this shows as a neutral rest day.
+- **User has notifications disabled at OS level:** Reminders section in Profile should detect this and show: "Notifications are turned off in your phone settings" with a "Open Settings" link that deep-links to the app's OS notification settings.
+- **Timezone changes / travel:** Use device local time for all calculations. Recalculate schedules based on current timezone.
+- **App is force-closed:** Local notifications still fire (they're OS-level).
+- **User changes reminder time:** Cancel existing scheduled notification and re-schedule with new time immediately.
+
+---
+
+## 5. Tone of Notifications
+
+All notification copy must match the app's warm, encouraging voice. NEVER use:
+- "You haven't done anything today"
+- "Task overdue"
+- "Don't break your streak!"
+- "Time is running out!"
+
+Notifications should feel like a gentle friend tapping your shoulder, not an alarm going off.
