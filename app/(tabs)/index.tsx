@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   ScrollView,
   Platform,
   Modal,
-  Alert,
+  Image,
   Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,7 +16,6 @@ import { router } from 'expo-router';
 import Animated, {
   FadeIn,
   FadeInDown,
-  FadeInUp,
   SlideInUp,
   useAnimatedStyle,
   useSharedValue,
@@ -24,33 +23,157 @@ import Animated, {
   withSequence,
   withTiming,
   withDelay,
-  runOnJS,
+  Easing,
+  interpolate,
 } from 'react-native-reanimated';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import Colors from '@/constants/colors';
 import { useApp } from '@/lib/AppContext';
+import { DailyEntry, saveEntry } from '@/lib/storage';
 import { getGreeting, formatDate, getTodayDate, getStreakMessage } from '@/lib/storage';
 
 type MoodType = 'energized' | 'calm' | 'neutral' | 'tough';
 
-const moodOptions: { key: MoodType; icon: string; label: string; iconSet: 'feather' | 'ionicons' }[] = [
-  { key: 'energized', icon: 'flame-outline', label: 'Energized', iconSet: 'ionicons' },
-  { key: 'calm', icon: 'leaf-outline', label: 'Calm', iconSet: 'ionicons' },
-  { key: 'neutral', icon: 'remove-circle-outline', label: 'Neutral', iconSet: 'ionicons' },
-  { key: 'tough', icon: 'fitness-outline', label: 'Tough', iconSet: 'ionicons' },
+const GENERIC_MESSAGES = [
+  "Done and dusted. The rest of the day is yours.",
+  "One thing. Done. That's a win.",
+  "You showed up today. That matters more than you think.",
+  "Nothing left to do. How good does that feel?",
+  "Today's sorted. Go enjoy the rest of it.",
+  "You said you'd do it, and you did. That's who you are.",
+  "That's it. You're free. Go do something fun.",
+  "Look at you, showing up for yourself.",
 ];
 
-function TaskCard({ task, onComplete }: { task: any; onComplete: (id: string) => void }) {
-  const scale = useSharedValue(1);
-  const checkScale = useSharedValue(0);
+const STREAK_MESSAGES: Record<number, string> = {
+  3: "Three days running. Something's clicking.",
+  5: "Five days in. This is becoming your thing.",
+  7: "A whole week. You've earned what comes next.",
+  10: "Ten days. Double digits. That's real momentum.",
+  14: "Two weeks of showing up. That's not luck \u2014 that's you.",
+  21: "Three weeks. You're not trying anymore \u2014 you just do this now.",
+  30: "30 days. You've built something real.",
+  50: "Fifty days. Most people never get here. You did.",
+  100: "One hundred days. That's not a streak \u2014 that's who you are.",
+};
+
+const LEVEL_UP_MESSAGES: Record<string, string> = {
+  '1_2': "You've unlocked 2 tasks per day. You earned this.",
+  '2_3': "Three tasks per day. Look how far you've come.",
+};
+
+const moodOptions: { key: MoodType; icon: string; label: string }[] = [
+  { key: 'energized', icon: 'flame-outline', label: 'Energized' },
+  { key: 'calm', icon: 'leaf-outline', label: 'Calm' },
+  { key: 'neutral', icon: 'remove-circle-outline', label: 'Neutral' },
+  { key: 'tough', icon: 'fitness-outline', label: 'Tough' },
+];
+
+const moodDisplay: Record<string, { icon: string; label: string }> = {
+  energized: { icon: 'flame-outline', label: 'Energized' },
+  calm: { icon: 'leaf-outline', label: 'Calm' },
+  neutral: { icon: 'remove-circle-outline', label: 'Neutral' },
+  tough: { icon: 'fitness-outline', label: 'Tough' },
+};
+
+const SAGE_GREEN = '#7DB07A';
+
+function AnimatedCheckmark({ animate, delay: startDelay }: { animate: boolean; delay: number }) {
+  const progress = useSharedValue(0);
+  const pulseScale = useSharedValue(1);
 
   useEffect(() => {
-    if (task.isCompleted) {
-      checkScale.value = withSpring(1, { damping: 12 });
+    if (animate) {
+      progress.value = withDelay(
+        startDelay,
+        withTiming(1, { duration: 600, easing: Easing.out(Easing.cubic) })
+      );
+      pulseScale.value = withDelay(
+        startDelay + 600,
+        withSequence(
+          withTiming(1.3, { duration: 200 }),
+          withSpring(1, { damping: 10 })
+        )
+      );
+    } else {
+      progress.value = 1;
+      pulseScale.value = 1;
     }
-  }, [task.isCompleted]);
+  }, [animate]);
+
+  const containerStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseScale.value }],
+  }));
+
+  const checkStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0, 0.3, 1], [0, 1, 1]),
+    transform: [{ scale: interpolate(progress.value, [0, 0.5, 1], [0.5, 1.1, 1]) }],
+  }));
+
+  return (
+    <Animated.View style={[styles.completedCheckCircle, containerStyle]}>
+      <Animated.View style={checkStyle}>
+        <Feather name="check" size={18} color="#FFF" />
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
+function CompletedTaskCard({
+  task,
+  animate,
+  onProofTap,
+}: {
+  task: any;
+  animate: boolean;
+  onProofTap?: (uri: string) => void;
+}) {
+  const borderOpacity = useSharedValue(animate ? 0 : 1);
+
+  useEffect(() => {
+    if (animate) {
+      borderOpacity.value = withDelay(300, withTiming(1, { duration: 400 }));
+    }
+  }, [animate]);
+
+  const borderStyle = useAnimatedStyle(() => ({
+    opacity: borderOpacity.value,
+  }));
+
+  const completedTime = task.completedAt
+    ? new Date(task.completedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    : null;
+
+  return (
+    <View style={styles.completedCardOuter}>
+      <Animated.View style={[styles.completedCardBorder, borderStyle]} />
+      <View style={styles.completedCardInner}>
+        <View style={styles.completedCardTop}>
+          <AnimatedCheckmark animate={animate} delay={0} />
+          <View style={styles.completedCardTextWrap}>
+            <Text style={styles.completedTaskText}>{task.text}</Text>
+            {completedTime && (
+              <Text style={styles.completedTimeText}>Done at {completedTime}</Text>
+            )}
+          </View>
+        </View>
+        {task.proof?.uri && (
+          <Pressable
+            onPress={() => onProofTap?.(task.proof.uri)}
+            style={styles.proofThumbnailWrap}
+          >
+            <Image source={{ uri: task.proof.uri }} style={styles.proofThumbnail} />
+          </Pressable>
+        )}
+      </View>
+    </View>
+  );
+}
+
+function ActiveTaskCard({ task, onComplete }: { task: any; onComplete: (id: string) => void }) {
+  const scale = useSharedValue(1);
 
   const cardStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -71,13 +194,11 @@ function TaskCard({ task, onComplete }: { task: any; onComplete: (id: string) =>
     <Animated.View entering={FadeInDown.duration(400).springify()} style={cardStyle}>
       <Pressable
         onPress={handlePress}
-        style={[styles.taskCard, task.isCompleted && styles.taskCardCompleted]}
+        style={[styles.taskCard, task.isCompleted && styles.taskCardDoneInline]}
       >
         <View style={styles.taskLeft}>
           <View style={[styles.checkbox, task.isCompleted && styles.checkboxCompleted]}>
-            {task.isCompleted && (
-              <Feather name="check" size={14} color="#FFF" />
-            )}
+            {task.isCompleted && <Feather name="check" size={14} color="#FFF" />}
           </View>
           <Text style={[styles.taskText, task.isCompleted && styles.taskTextCompleted]}>
             {task.text}
@@ -136,11 +257,40 @@ function CelebrationOverlay({ visible, streak, leveledUp, onDismiss }: {
   );
 }
 
+function getCompletionMessage(
+  entry: DailyEntry,
+  streak: number,
+  leveledUp: boolean,
+  prevLevel?: number
+): { message: string; index: number } {
+  if (leveledUp && prevLevel !== undefined) {
+    const key = `${prevLevel}_${prevLevel + 1}`;
+    if (LEVEL_UP_MESSAGES[key]) {
+      return { message: LEVEL_UP_MESSAGES[key], index: -2 };
+    }
+  }
+
+  if (STREAK_MESSAGES[streak]) {
+    return { message: STREAK_MESSAGES[streak], index: -1 };
+  }
+
+  if (entry.completionMessageIndex !== undefined && entry.completionMessageIndex >= 0) {
+    return {
+      message: GENERIC_MESSAGES[entry.completionMessageIndex % GENERIC_MESSAGES.length],
+      index: entry.completionMessageIndex,
+    };
+  }
+
+  const randomIndex = Math.floor(Math.random() * GENERIC_MESSAGES.length);
+  return { message: GENERIC_MESSAGES[randomIndex], index: randomIndex };
+}
+
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const {
     profile,
     todayEntry,
+    entries,
     addTask,
     completeTask,
     addReflection,
@@ -158,9 +308,46 @@ export default function HomeScreen() {
   const [showReflection, setShowReflection] = useState(false);
   const [reflectionNote, setReflectionNote] = useState('');
   const [showCelebration, setShowCelebration] = useState(false);
+  const [proofViewUri, setProofViewUri] = useState<string | null>(null);
+  const [playAnimation, setPlayAnimation] = useState(false);
+  const justCompletedRef = useRef(false);
 
-  const allDone = todayEntry?.tasks?.length > 0 && todayEntry.tasks.every(t => t.isCompleted);
-  const hasTasks = todayEntry?.tasks?.length > 0;
+  const allDone = (todayEntry?.tasks?.length ?? 0) > 0 && (todayEntry?.tasks?.every(t => t.isCompleted) ?? false);
+  const hasTasks = (todayEntry?.tasks?.length ?? 0) > 0;
+  const someDone = hasTasks && !allDone && todayEntry!.tasks.some(t => t.isCompleted);
+
+  const messageOpacity = useSharedValue(0);
+  const reflectionOpacity = useSharedValue(0);
+  const footerOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (allDone && todayEntry) {
+      if (!todayEntry.completionAnimationSeen && !justCompletedRef.current) {
+        justCompletedRef.current = true;
+        setPlayAnimation(true);
+
+        messageOpacity.value = withDelay(900, withTiming(1, { duration: 500 }));
+        reflectionOpacity.value = withDelay(1200, withTiming(1, { duration: 500 }));
+        footerOpacity.value = withDelay(1500, withTiming(1, { duration: 500 }));
+
+        const markSeen = async () => {
+          const msgData = getCompletionMessage(todayEntry, profile?.currentLevelStreak ?? 0, justLeveledUp);
+          const updated = {
+            ...todayEntry,
+            completionAnimationSeen: true,
+            completionMessageIndex: todayEntry.completionMessageIndex ?? msgData.index,
+          };
+          await saveEntry(updated);
+        };
+        setTimeout(markSeen, 2000);
+      } else {
+        messageOpacity.value = 1;
+        reflectionOpacity.value = 1;
+        footerOpacity.value = 1;
+        setPlayAnimation(false);
+      }
+    }
+  }, [allDone, todayEntry?.completed]);
 
   useEffect(() => {
     if (!isLoading && profile && !profile.onboardingComplete) {
@@ -253,6 +440,22 @@ export default function HomeScreen() {
   const dateStr = formatDate(getTodayDate());
   const streakDays = profile.currentLevelStreak;
 
+  const completionMsg = allDone && todayEntry
+    ? getCompletionMessage(todayEntry, streakDays, justLeveledUp, justLeveledUp ? (profile.currentLevel - 1) : undefined)
+    : null;
+
+  const messageAnimStyle = useAnimatedStyle(() => ({
+    opacity: messageOpacity.value,
+  }));
+
+  const reflectionAnimStyle = useAnimatedStyle(() => ({
+    opacity: reflectionOpacity.value,
+  }));
+
+  const footerAnimStyle = useAnimatedStyle(() => ({
+    opacity: footerOpacity.value,
+  }));
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -270,23 +473,16 @@ export default function HomeScreen() {
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.levelBar}>
-          <Text style={styles.levelText}>
-            Level {profile.currentLevel}
-          </Text>
+          <Text style={styles.levelText}>Level {profile.currentLevel}</Text>
           <View style={styles.levelDots}>
             {Array.from({ length: 7 }).map((_, i) => (
               <View
                 key={i}
-                style={[
-                  styles.levelDot,
-                  i < streakDays && styles.levelDotFilled,
-                ]}
+                style={[styles.levelDot, i < streakDays && styles.levelDotFilled]}
               />
             ))}
           </View>
-          <Text style={styles.levelDaysText}>
-            Day {Math.min(streakDays, 7)} of 7
-          </Text>
+          <Text style={styles.levelDaysText}>Day {Math.min(streakDays, 7)} of 7</Text>
         </Animated.View>
 
         {yesterdayMissed && (
@@ -297,37 +493,63 @@ export default function HomeScreen() {
           </Animated.View>
         )}
 
-        {streakDays > 0 && (
+        {streakDays > 0 && !allDone && (
           <Animated.View entering={FadeInDown.delay(250)} style={styles.streakBanner}>
             <Feather name="zap" size={16} color={Colors.streakGlow} />
             <Text style={styles.streakText}>{streakDays} day streak</Text>
           </Animated.View>
         )}
 
-        {hasTasks ? (
+        {allDone && todayEntry ? (
+          <View style={styles.completedStateWrap}>
+            <Animated.View style={[styles.completionMessageWrap, messageAnimStyle]}>
+              <Text style={styles.completionMessage}>
+                {completionMsg?.message}
+              </Text>
+            </Animated.View>
+
+            {todayEntry.tasks.map((task) => (
+              <CompletedTaskCard
+                key={task.id}
+                task={task}
+                animate={playAnimation}
+                onProofTap={(uri) => setProofViewUri(uri)}
+              />
+            ))}
+
+            {todayEntry.reflection && (
+              <Animated.View style={[styles.journalWrap, reflectionAnimStyle]}>
+                <View style={styles.journalMoodRow}>
+                  <Ionicons
+                    name={moodDisplay[todayEntry.reflection.mood]?.icon as any}
+                    size={20}
+                    color={Colors.textSecondary}
+                  />
+                  <Text style={styles.journalMoodLabel}>
+                    {moodDisplay[todayEntry.reflection.mood]?.label}
+                  </Text>
+                </View>
+                {todayEntry.reflection.note ? (
+                  <Text style={styles.journalNote}>
+                    "{todayEntry.reflection.note}"
+                  </Text>
+                ) : null}
+              </Animated.View>
+            )}
+
+            <Animated.View style={[styles.footerWrap, footerAnimStyle]}>
+              <Text style={styles.footerText}>See you tomorrow</Text>
+            </Animated.View>
+          </View>
+        ) : hasTasks ? (
           <View style={styles.tasksSection}>
             {todayEntry?.tasks.map((task) => (
-              <TaskCard
+              <ActiveTaskCard
                 key={task.id}
                 task={task}
                 onComplete={handleCompleteTask}
               />
             ))}
-
-            {allDone && todayEntry?.reflection && (
-              <Animated.View entering={FadeInDown.delay(200)} style={styles.reflectionCard}>
-                <View style={styles.reflectionHeader}>
-                  <Feather name="heart" size={14} color={Colors.accent} />
-                  <Text style={styles.reflectionLabel}>Today's reflection</Text>
-                </View>
-                <Text style={styles.reflectionMood}>
-                  Feeling {todayEntry.reflection.mood}
-                </Text>
-                {todayEntry.reflection.note && (
-                  <Text style={styles.reflectionNoteText}>{todayEntry.reflection.note}</Text>
-                )}
-              </Animated.View>
-            )}
 
             {canAddMoreTasks && !allDone && (
               <Pressable
@@ -395,7 +617,6 @@ export default function HomeScreen() {
             <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle}>Add proof</Text>
             <Text style={styles.sheetSubtitle}>Optional — capture your progress</Text>
-
             <View style={styles.sheetOptions}>
               <Pressable
                 style={({ pressed }) => [styles.proofOption, pressed && { opacity: 0.7 }]}
@@ -416,7 +637,6 @@ export default function HomeScreen() {
                 <Text style={styles.proofOptionText}>Upload Screenshot</Text>
               </Pressable>
             </View>
-
             <Pressable
               style={({ pressed }) => [styles.skipProofButton, pressed && { opacity: 0.7 }]}
               onPress={() => handleProofOption('skip')}
@@ -456,6 +676,27 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
+      <Modal visible={!!proofViewUri} transparent animationType="fade">
+        <Pressable
+          style={styles.proofViewOverlay}
+          onPress={() => setProofViewUri(null)}
+        >
+          {proofViewUri && (
+            <Image
+              source={{ uri: proofViewUri }}
+              style={styles.proofViewImage}
+              resizeMode="contain"
+            />
+          )}
+          <Pressable
+            style={styles.proofViewClose}
+            onPress={() => setProofViewUri(null)}
+          >
+            <Feather name="x" size={24} color="#FFF" />
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       <CelebrationOverlay
         visible={showCelebration}
         streak={streakDays}
@@ -465,6 +706,8 @@ export default function HomeScreen() {
     </View>
   );
 }
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
   container: {
@@ -549,6 +792,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.streakGlow,
   },
+
   tasksSection: {
     gap: 12,
     marginTop: 8,
@@ -566,7 +810,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  taskCardCompleted: {
+  taskCardDoneInline: {
     backgroundColor: Colors.successLight,
     borderWidth: 1,
     borderColor: Colors.success + '30',
@@ -624,6 +868,120 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textSecondary,
   },
+
+  completedStateWrap: {
+    marginTop: 8,
+  },
+  completionMessageWrap: {
+    marginBottom: 24,
+    paddingHorizontal: 8,
+  },
+  completionMessage: {
+    fontFamily: 'Nunito_700Bold',
+    fontSize: 21,
+    color: Colors.textPrimary,
+    textAlign: 'center',
+    lineHeight: 30,
+  },
+  completedCardOuter: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    overflow: 'hidden',
+    shadowColor: 'rgba(125, 176, 122, 0.15)',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  completedCardBorder: {
+    width: 4,
+    backgroundColor: SAGE_GREEN,
+    borderTopLeftRadius: 16,
+    borderBottomLeftRadius: 16,
+  },
+  completedCardInner: {
+    flex: 1,
+    padding: 18,
+    gap: 12,
+  },
+  completedCardTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 14,
+  },
+  completedCheckCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: SAGE_GREEN,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 1,
+  },
+  completedCardTextWrap: {
+    flex: 1,
+    gap: 4,
+  },
+  completedTaskText: {
+    fontFamily: 'DMSans_500Medium',
+    fontSize: 16,
+    color: Colors.textSecondary,
+  },
+  completedTimeText: {
+    fontFamily: 'DMSans_400Regular',
+    fontSize: 13,
+    color: Colors.neutral,
+  },
+  proofThumbnailWrap: {
+    marginLeft: 42,
+    width: 56,
+    height: 56,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: Colors.inputBg,
+  },
+  proofThumbnail: {
+    width: 56,
+    height: 56,
+  },
+
+  journalWrap: {
+    marginTop: 20,
+    paddingHorizontal: 8,
+    gap: 6,
+  },
+  journalMoodRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  journalMoodLabel: {
+    fontFamily: 'DMSans_500Medium',
+    fontSize: 15,
+    color: Colors.textSecondary,
+  },
+  journalNote: {
+    fontFamily: 'DMSans_400Regular',
+    fontSize: 14,
+    color: Colors.textSecondary,
+    fontStyle: 'italic' as const,
+    marginTop: 2,
+    lineHeight: 21,
+  },
+
+  footerWrap: {
+    marginTop: 60,
+    alignItems: 'center',
+    paddingBottom: 40,
+  },
+  footerText: {
+    fontFamily: 'DMSans_400Regular',
+    fontSize: 14,
+    color: Colors.neutral,
+  },
+
   emptyState: {
     alignItems: 'center',
     paddingTop: 60,
@@ -698,6 +1056,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+
   sheetOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
@@ -765,6 +1124,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textSecondary,
   },
+
   reflectionOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
@@ -818,36 +1178,30 @@ const styles = StyleSheet.create({
     padding: 14,
     textAlign: 'center',
   },
-  reflectionCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 16,
-    gap: 6,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-  },
-  reflectionHeader: {
-    flexDirection: 'row',
+
+  proofViewOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 6,
   },
-  reflectionLabel: {
-    fontFamily: 'DMSans_400Regular',
-    fontSize: 12,
-    color: Colors.textSecondary,
+  proofViewImage: {
+    width: SCREEN_WIDTH - 48,
+    height: SCREEN_WIDTH - 48,
+    borderRadius: 12,
   },
-  reflectionMood: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 15,
-    color: Colors.textPrimary,
-    textTransform: 'capitalize',
+  proofViewClose: {
+    position: 'absolute' as const,
+    top: 60,
+    right: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  reflectionNoteText: {
-    fontFamily: 'DMSans_400Regular',
-    fontSize: 14,
-    color: Colors.textSecondary,
-    fontStyle: 'italic' as const,
-  },
+
   celebrationOverlay: {
     flex: 1,
     backgroundColor: 'rgba(250, 247, 242, 0.92)',

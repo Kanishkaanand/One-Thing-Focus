@@ -21,7 +21,7 @@ interface AppContextValue {
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   addTask: (text: string) => Promise<void>;
   completeTask: (taskId: string, proof?: TaskItem['proof']) => Promise<void>;
-  addReflection: (mood: DailyEntry['reflection']['mood'], note?: string) => Promise<void>;
+  addReflection: (mood: 'energized' | 'calm' | 'neutral' | 'tough', note?: string) => Promise<void>;
   canAddMoreTasks: boolean;
   refreshData: () => Promise<void>;
   yesterdayMissed: boolean;
