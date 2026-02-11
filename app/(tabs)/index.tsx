@@ -370,7 +370,9 @@ export default function HomeScreen() {
   const [showCelebration, setShowCelebration] = useState(false);
   const [proofViewUri, setProofViewUri] = useState<string | null>(null);
   const [playAnimation, setPlayAnimation] = useState(false);
+  const [proofToast, setProofToast] = useState(false);
   const justCompletedRef = useRef(false);
+  const pendingCelebrationRef = useRef(false);
 
   const allDone = (todayEntry?.tasks?.length ?? 0) > 0 && (todayEntry?.tasks?.every(t => t.isCompleted) ?? false);
   const hasTasks = (todayEntry?.tasks?.length ?? 0) > 0;
@@ -443,11 +445,13 @@ export default function HomeScreen() {
   const handleProofOption = async (type: 'photo' | 'screenshot' | 'skip') => {
     if (!completingTaskId) return;
 
+    let hadProof = false;
+
     if (type === 'skip') {
       await completeTask(completingTaskId);
       setShowProofSheet(false);
       setCompletingTaskId(null);
-      checkForCompletion();
+      checkForCompletion(false);
       return;
     }
 
@@ -462,6 +466,7 @@ export default function HomeScreen() {
           type: type === 'photo' ? 'photo' : 'screenshot',
           uri: result.assets[0].uri,
         });
+        hadProof = true;
       } else {
         await completeTask(completingTaskId);
       }
@@ -471,23 +476,36 @@ export default function HomeScreen() {
 
     setShowProofSheet(false);
     setCompletingTaskId(null);
-    checkForCompletion();
+    checkForCompletion(hadProof);
   };
 
-  const checkForCompletion = () => {
-    setTimeout(() => {
-      if (justLeveledUp) {
-        setShowCelebration(true);
-      } else {
-        const updated = todayEntry?.tasks?.map(t =>
-          t.id === completingTaskId ? { ...t, isCompleted: true } : t
-        );
-        const done = updated?.every(t => t.isCompleted);
-        if (done && updated && updated.length > 0) {
+  const checkForCompletion = (showToast: boolean) => {
+    const willCelebrate = () => {
+      if (justLeveledUp) return true;
+      const updated = todayEntry?.tasks?.map(t =>
+        t.id === completingTaskId ? { ...t, isCompleted: true } : t
+      );
+      return updated?.every(t => t.isCompleted) && updated && updated.length > 0;
+    };
+
+    if (showToast) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setProofToast(true);
+      pendingCelebrationRef.current = !!willCelebrate();
+      setTimeout(() => {
+        setProofToast(false);
+        if (pendingCelebrationRef.current) {
+          pendingCelebrationRef.current = false;
+          setTimeout(() => setShowCelebration(true), 200);
+        }
+      }, 2200);
+    } else {
+      setTimeout(() => {
+        if (willCelebrate()) {
           setShowCelebration(true);
         }
-      }
-    }, 300);
+      }, 300);
+    }
   };
 
   const handleCelebrationDismiss = () => {
@@ -765,6 +783,21 @@ export default function HomeScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {proofToast && (
+        <Animated.View
+          entering={FadeInDown.duration(400).springify()}
+          style={[styles.proofToast, { bottom: insets.bottom + 80 }]}
+        >
+          <View style={styles.proofToastIcon}>
+            <Feather name="check-circle" size={22} color={Colors.success} />
+          </View>
+          <View style={styles.proofToastTextWrap}>
+            <Text style={styles.proofToastTitle}>Proof submitted</Text>
+            <Text style={styles.proofToastMsg}>Really proud of you for showing up today</Text>
+          </View>
+        </Animated.View>
+      )}
 
       <CelebrationOverlay
         visible={showCelebration}
@@ -1300,6 +1333,49 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+
+  proofToast: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    shadowColor: 'rgba(0,0,0,0.15)',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 1,
+    shadowRadius: 16,
+    elevation: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.success,
+    zIndex: 999,
+  },
+  proofToastIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.successLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  proofToastTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  proofToastTitle: {
+    fontFamily: 'Nunito_700Bold',
+    fontSize: 15,
+    color: Colors.textPrimary,
+  },
+  proofToastMsg: {
+    fontFamily: 'DMSans_400Regular',
+    fontSize: 13,
+    color: Colors.textSecondary,
+    lineHeight: 18,
   },
 
   celebrationOverlay: {
