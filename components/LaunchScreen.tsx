@@ -109,11 +109,12 @@ export default function LaunchScreen({ onComplete }: LaunchScreenProps) {
         <View style={styles.content}>
           <Animated.View style={[styles.checkWrap, { opacity: checkOpacity }]}>
             <OrganicCheck
-              size={120}
+              size={140}
               color={Colors.accent}
               animate={drawCheck}
               animationDuration={800}
               animationDelay={0}
+              showCircle={true}
             />
           </Animated.View>
 
