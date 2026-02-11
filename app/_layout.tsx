@@ -1,10 +1,12 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import LaunchScreen from "@/components/LaunchScreen";
 import Colors from "@/constants/colors";
 import { queryClient } from "@/lib/query-client";
 import { AppProvider } from "@/lib/AppContext";
@@ -45,6 +47,7 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  const [showLaunch, setShowLaunch] = useState(true);
   const [fontsLoaded] = useFonts({
     Nunito_400Regular,
     Nunito_500Medium,
@@ -70,7 +73,12 @@ export default function RootLayout() {
           <KeyboardProvider>
             <AppProvider>
               <StatusBar style="dark" />
-              <RootLayoutNav />
+              <View style={{ flex: 1 }}>
+                <RootLayoutNav />
+                {showLaunch && (
+                  <LaunchScreen onComplete={() => setShowLaunch(false)} />
+                )}
+              </View>
             </AppProvider>
           </KeyboardProvider>
         </GestureHandlerRootView>
