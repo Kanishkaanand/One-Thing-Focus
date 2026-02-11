@@ -68,6 +68,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@babel/preset-typescript": "^7.28.5",
     "@expo/ngrok": "^4.1.0",
     "@types/express": "^5.0.0",
     "@types/jest": "^29.5.12",

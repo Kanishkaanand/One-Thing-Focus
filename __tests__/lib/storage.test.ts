@@ -206,8 +206,8 @@ describe('processEndOfDay', () => {
     reminderCompleteTask: { enabled: false, time: '18:00' },
   };
 
-  it('should return unchanged profile if yesterday has no entry and no prior entries', () => {
-    const result = processEndOfDay(baseProfile, {});
+  it('should return unchanged profile if yesterday has no entry and no prior entries', async () => {
+    const result = await processEndOfDay(baseProfile, {});
     expect(result).toEqual(baseProfile);
   });
 
