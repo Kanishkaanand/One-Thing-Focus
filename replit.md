@@ -59,3 +59,8 @@ constants/
 - Added emojis to footer: moon emoji, "Rest up, you earned it" sparkle subtext
 - Added reset app data feature in profile settings with confirmation modal
 - Fixed streak persistence bug in processEndOfDay (no longer resets for new users or inactive days)
+- Made onboarding slides swipeable (right-to-left) on mobile
+- Calendar view: disabled forward navigation beyond current month
+- Fixed day-detail bottom sheet: changed from formSheet to modal presentation for cross-platform compatibility
+- Added level upgrade/downgrade context info card in profile screen
+- Added proof submission toast with encouraging message before celebration
