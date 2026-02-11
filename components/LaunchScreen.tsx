@@ -5,9 +5,9 @@ import {
   StyleSheet,
   Animated,
   Pressable,
-  Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import OrganicCheck from '@/components/OrganicCheck';
 import Colors from '@/constants/colors';
 
 const taglines = [
@@ -41,14 +41,14 @@ interface LaunchScreenProps {
 }
 
 export default function LaunchScreen({ onComplete }: LaunchScreenProps) {
-  const logoOpacity = useRef(new Animated.Value(0)).current;
-  const logoScale = useRef(new Animated.Value(0.85)).current;
+  const checkOpacity = useRef(new Animated.Value(0)).current;
   const nameOpacity = useRef(new Animated.Value(0)).current;
   const taglineOpacity = useRef(new Animated.Value(0)).current;
   const taglineTranslateY = useRef(new Animated.Value(10)).current;
   const screenOpacity = useRef(new Animated.Value(1)).current;
 
   const [tagline, setTagline] = useState('');
+  const [drawCheck, setDrawCheck] = useState(false);
   const animRef = useRef<Animated.CompositeAnimation | null>(null);
   const completedRef = useRef(false);
 
@@ -62,27 +62,19 @@ export default function LaunchScreen({ onComplete }: LaunchScreenProps) {
   useEffect(() => {
     pickRandomTagline().then(setTagline);
 
+    const timer = setTimeout(() => {
+      setDrawCheck(true);
+      checkOpacity.setValue(1);
+    }, 200);
+
     const anim = Animated.sequence([
-      Animated.delay(200),
-      Animated.parallel([
-        Animated.timing(logoOpacity, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(logoScale, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-      ]),
-      Animated.delay(100),
+      Animated.delay(1000),
       Animated.timing(nameOpacity, {
         toValue: 1,
         duration: 300,
         useNativeDriver: true,
       }),
-      Animated.delay(100),
+      Animated.delay(300),
       Animated.parallel([
         Animated.timing(taglineOpacity, {
           toValue: 1,
@@ -107,22 +99,21 @@ export default function LaunchScreen({ onComplete }: LaunchScreenProps) {
     anim.start(({ finished }) => {
       if (finished) finish();
     });
+
+    return () => clearTimeout(timer);
   }, []);
 
   return (
     <Pressable onPress={finish} style={StyleSheet.absoluteFill}>
       <Animated.View style={[styles.container, { opacity: screenOpacity }]}>
         <View style={styles.content}>
-          <Animated.View
-            style={[
-              styles.logoWrap,
-              { opacity: logoOpacity, transform: [{ scale: logoScale }] },
-            ]}
-          >
-            <Image
-              source={require('@/assets/images/sunrise-logo.png')}
-              style={styles.logo}
-              resizeMode="contain"
+          <Animated.View style={[styles.checkWrap, { opacity: checkOpacity }]}>
+            <OrganicCheck
+              size={120}
+              color={Colors.accent}
+              animate={drawCheck}
+              animationDuration={800}
+              animationDelay={0}
             />
           </Animated.View>
 
@@ -159,12 +150,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 40,
   },
-  logoWrap: {
+  checkWrap: {
     marginBottom: 16,
-  },
-  logo: {
-    width: 120,
-    height: 120,
   },
   appName: {
     fontFamily: 'Nunito_700Bold',
