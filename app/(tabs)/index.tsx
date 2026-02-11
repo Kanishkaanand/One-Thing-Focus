@@ -10,6 +10,7 @@ import {
   Modal,
   Image,
   Dimensions,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -643,35 +644,41 @@ export default function HomeScreen() {
           </Animated.View>
         )}
 
-        {showInput && (
-          <Animated.View entering={SlideInUp.duration(300)} style={styles.inputCard}>
-            <TextInput
-              testID="task-input"
-              style={styles.taskInput}
-              placeholder="What will you focus on?"
-              placeholderTextColor={Colors.neutral}
-              value={taskInput}
-              onChangeText={setTaskInput}
-              autoFocus
-              returnKeyType="done"
-              onSubmitEditing={handleAddTask}
-              multiline={false}
-            />
-            <View style={styles.inputActions}>
-              <Pressable onPress={() => { setShowInput(false); setTaskInput(''); }}>
-                <Feather name="x" size={22} color={Colors.textSecondary} />
-              </Pressable>
+      </ScrollView>
+
+      <Modal visible={showInput} transparent animationType="fade">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.inputModalWrap}
+        >
+          <Pressable style={styles.inputModalBackdrop} onPress={() => { setShowInput(false); setTaskInput(''); }} />
+          <Animated.View entering={FadeInDown.duration(250)} style={[styles.inputSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+            <View style={styles.inputSheetHandle} />
+            <Text style={styles.inputSheetTitle}>What will you focus on?</Text>
+            <View style={styles.inputRow}>
+              <TextInput
+                testID="task-input"
+                style={styles.taskInput}
+                placeholder="Type your task here..."
+                placeholderTextColor={Colors.neutral}
+                value={taskInput}
+                onChangeText={setTaskInput}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={handleAddTask}
+                multiline={false}
+              />
               <Pressable
                 onPress={handleAddTask}
                 style={[styles.submitBtn, !taskInput.trim() && { opacity: 0.4 }]}
                 disabled={!taskInput.trim()}
               >
-                <Feather name="check" size={20} color="#FFF" />
+                <Feather name="arrow-up" size={20} color="#FFF" />
               </Pressable>
             </View>
           </Animated.View>
-        )}
-      </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
 
       <Modal visible={showProofSheet} transparent animationType="slide">
         <Pressable style={styles.sheetOverlay} onPress={() => setShowProofSheet(false)}>
@@ -1096,35 +1103,56 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#FFF',
   },
-  inputCard: {
+  inputModalWrap: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  inputModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  inputSheet: {
     backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    marginTop: 16,
-    shadowColor: Colors.cardShadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 12,
-    elevation: 4,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
+  inputSheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.neutral,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  inputSheetTitle: {
+    fontFamily: 'Nunito_600SemiBold',
+    fontSize: 18,
+    color: Colors.textPrimary,
+    marginBottom: 16,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
   },
   taskInput: {
+    flex: 1,
     fontFamily: 'DMSans_500Medium',
     fontSize: 17,
     color: Colors.textPrimary,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    marginBottom: 12,
-  },
-  inputActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    backgroundColor: Colors.inputBg,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
   },
   submitBtn: {
     backgroundColor: Colors.accent,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
