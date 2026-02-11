@@ -140,6 +140,10 @@ export function generateId(): string {
   return Date.now().toString() + Math.random().toString(36).substr(2, 9);
 }
 
+export async function clearAllData(): Promise<void> {
+  await AsyncStorage.multiRemove([PROFILE_KEY, ENTRIES_KEY]);
+}
+
 export async function processEndOfDay(profile: UserProfile, entries: Record<string, DailyEntry>): Promise<UserProfile> {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);

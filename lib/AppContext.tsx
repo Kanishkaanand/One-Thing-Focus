@@ -10,6 +10,7 @@ import {
   getTodayDate,
   generateId,
   processEndOfDay,
+  clearAllData,
 } from './storage';
 import { syncNotifications, rescheduleAllReminders } from './notifications';
 
@@ -24,6 +25,7 @@ interface AppContextValue {
   addReflection: (mood: 'energized' | 'calm' | 'neutral' | 'tough', note?: string) => Promise<void>;
   canAddMoreTasks: boolean;
   refreshData: () => Promise<void>;
+  resetAllData: () => Promise<void>;
   yesterdayMissed: boolean;
   justLeveledUp: boolean;
   setJustLeveledUp: (v: boolean) => void;
@@ -164,6 +166,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setEntries(prev => ({ ...prev, [todayEntry.date]: updated }));
   }, [todayEntry]);
 
+  const resetAllData = useCallback(async () => {
+    await clearAllData();
+    setProfile(null);
+    setTodayEntry(null);
+    setEntries({});
+    setJustLeveledUp(false);
+    setYesterdayMissed(false);
+  }, []);
+
   const canAddMoreTasks = useMemo(() => {
     if (!profile || !todayEntry) return true;
     if (!todayEntry.tasks) return true;
@@ -181,10 +192,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addReflection,
     canAddMoreTasks,
     refreshData: loadData,
+    resetAllData,
     yesterdayMissed,
     justLeveledUp,
     setJustLeveledUp,
-  }), [profile, todayEntry, entries, isLoading, updateProfile, addTask, completeTask, addReflection, canAddMoreTasks, loadData, yesterdayMissed, justLeveledUp]);
+  }), [profile, todayEntry, entries, isLoading, updateProfile, addTask, completeTask, addReflection, canAddMoreTasks, loadData, resetAllData, yesterdayMissed, justLeveledUp]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

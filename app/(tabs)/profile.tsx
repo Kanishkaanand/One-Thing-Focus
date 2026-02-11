@@ -9,7 +9,9 @@ import {
   Platform,
   Switch,
   Modal,
+  Alert,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
@@ -123,9 +125,11 @@ function TimePicker({
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { profile, entries, updateProfile, isLoading } = useApp();
+  const router = useRouter();
+  const { profile, entries, updateProfile, resetAllData, isLoading } = useApp();
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [notifStatus, setNotifStatus] = useState<{ granted: boolean; canAskAgain: boolean }>({ granted: true, canAskAgain: true });
   const [timePickerTarget, setTimePickerTarget] = useState<'pick' | 'complete' | null>(null);
 
@@ -321,12 +325,57 @@ export default function ProfileScreen() {
           </View>
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(500)} style={styles.aboutSection}>
+        <Animated.View entering={FadeInDown.delay(500)} style={styles.settingsSection}>
+          <Text style={styles.sectionTitle}>Settings</Text>
+          <Pressable
+            style={styles.resetRow}
+            onPress={() => setShowResetConfirm(true)}
+          >
+            <View style={styles.settingLeft}>
+              <Feather name="refresh-cw" size={18} color="#D45B5B" />
+              <Text style={styles.resetText}>Reset App Data</Text>
+            </View>
+            <Feather name="chevron-right" size={18} color={Colors.neutral} />
+          </Pressable>
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.delay(600)} style={styles.aboutSection}>
           <Text style={styles.sectionTitle}>About</Text>
           <Text style={styles.aboutText}>One Thing v1.0.0</Text>
           <Text style={styles.aboutCredit}>Made with care</Text>
         </Animated.View>
       </ScrollView>
+
+      <Modal visible={showResetConfirm} transparent animationType="fade">
+        <Pressable style={styles.resetOverlay} onPress={() => setShowResetConfirm(false)}>
+          <Pressable style={styles.resetSheet} onPress={e => e.stopPropagation()}>
+            <View style={styles.resetIconWrap}>
+              <Feather name="alert-triangle" size={28} color="#D45B5B" />
+            </View>
+            <Text style={styles.resetTitle}>Reset everything?</Text>
+            <Text style={styles.resetDesc}>
+              This will erase all your tasks, streaks, level progress, and settings. You'll start fresh from onboarding.
+            </Text>
+            <Pressable
+              style={styles.resetConfirmBtn}
+              onPress={async () => {
+                setShowResetConfirm(false);
+                await resetAllData();
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                router.replace('/onboarding');
+              }}
+            >
+              <Text style={styles.resetConfirmBtnText}>Yes, reset everything</Text>
+            </Pressable>
+            <Pressable
+              style={styles.resetCancelBtn}
+              onPress={() => setShowResetConfirm(false)}
+            >
+              <Text style={styles.resetCancelBtnText}>Never mind</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <TimePicker
         visible={timePickerTarget !== null}
@@ -624,5 +673,78 @@ const styles = StyleSheet.create({
     fontFamily: 'Nunito_600SemiBold',
     fontSize: 16,
     color: '#FFF',
+  },
+  resetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    padding: 16,
+  },
+  resetText: {
+    fontFamily: 'DMSans_500Medium',
+    fontSize: 15,
+    color: '#D45B5B',
+  },
+  resetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  resetSheet: {
+    backgroundColor: Colors.surface,
+    borderRadius: 24,
+    padding: 28,
+    width: '100%',
+    alignItems: 'center',
+  },
+  resetIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#D45B5B15',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  resetTitle: {
+    fontFamily: 'Nunito_700Bold',
+    fontSize: 20,
+    color: Colors.textPrimary,
+    marginBottom: 8,
+  },
+  resetDesc: {
+    fontFamily: 'DMSans_400Regular',
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  resetConfirmBtn: {
+    backgroundColor: '#D45B5B',
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 10,
+  },
+  resetConfirmBtnText: {
+    fontFamily: 'Nunito_600SemiBold',
+    fontSize: 16,
+    color: '#FFF',
+  },
+  resetCancelBtn: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    width: '100%',
+  },
+  resetCancelBtnText: {
+    fontFamily: 'DMSans_500Medium',
+    fontSize: 15,
+    color: Colors.textSecondary,
   },
 });
