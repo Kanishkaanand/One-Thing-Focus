@@ -1,5 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+export interface ReminderConfig {
+  enabled: boolean;
+  time: string;
+}
+
 export interface UserProfile {
   name: string;
   createdAt: string;
@@ -10,6 +15,8 @@ export interface UserProfile {
   reminderEnabled: boolean;
   reminderTime: string;
   onboardingComplete: boolean;
+  reminderPickTask: ReminderConfig;
+  reminderCompleteTask: ReminderConfig;
 }
 
 export interface TaskItem {
@@ -48,12 +55,26 @@ const defaultProfile: UserProfile = {
   reminderEnabled: false,
   reminderTime: '09:00',
   onboardingComplete: false,
+  reminderPickTask: {
+    enabled: false,
+    time: '08:00',
+  },
+  reminderCompleteTask: {
+    enabled: false,
+    time: '18:00',
+  },
 };
 
 export async function getProfile(): Promise<UserProfile> {
   const data = await AsyncStorage.getItem(PROFILE_KEY);
   if (!data) return { ...defaultProfile };
-  return JSON.parse(data);
+  const parsed = JSON.parse(data);
+  return {
+    ...defaultProfile,
+    ...parsed,
+    reminderPickTask: { ...defaultProfile.reminderPickTask, ...(parsed.reminderPickTask || {}) },
+    reminderCompleteTask: { ...defaultProfile.reminderCompleteTask, ...(parsed.reminderCompleteTask || {}) },
+  };
 }
 
 export async function saveProfile(profile: UserProfile): Promise<void> {
@@ -148,4 +169,14 @@ export function calculateCompletionRate(entries: Record<string, DailyEntry>): nu
   if (entryList.length === 0) return 0;
   const completed = entryList.filter(e => e.completed).length;
   return Math.round((completed / entryList.length) * 100);
+}
+
+export function formatTime12h(time24: string): string {
+  const [hStr, mStr] = time24.split(':');
+  let h = parseInt(hStr, 10);
+  const m = mStr;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  if (h === 0) h = 12;
+  else if (h > 12) h -= 12;
+  return `${h}:${m} ${ampm}`;
 }
