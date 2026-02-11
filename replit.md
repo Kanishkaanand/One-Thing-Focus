@@ -65,3 +65,5 @@ constants/
 - Added level upgrade/downgrade context info card in profile screen
 - Added proof submission toast with encouraging message before celebration
 - Added animated launch screen with sunrise logo and rotating taglines (tappable to skip)
+- Replaced app logo with "Organic Check" — hand-drawn checkmark SVG used across app icon, launch screen (draw animation), onboarding, empty state watermark, and task completion cards
+- OrganicCheck component (components/OrganicCheck.tsx) supports animated stroke-dashoffset draw, configurable size/color/opacity
