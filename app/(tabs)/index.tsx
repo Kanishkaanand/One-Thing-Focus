@@ -8,6 +8,7 @@ import {
   Platform,
   Dimensions,
   Image,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -33,6 +34,8 @@ import { useApp } from '@/lib/AppContext';
 import { DailyEntry, saveEntry, TaskItem } from '@/lib/storage';
 import { getGreeting, formatDate, getTodayDate, getStreakMessage } from '@/lib/storage';
 import { createLogger } from '@/lib/errorReporting';
+import { useScreenAnalytics } from '@/lib/useAnalytics';
+import { trackProofUploaded, trackProofSkipped } from '@/lib/analytics';
 import {
   TaskInputModal,
   ProofSheet,
@@ -377,6 +380,9 @@ export default function HomeScreen() {
     isLoading,
   } = useApp();
 
+  // Track screen views
+  useScreenAnalytics('Home');
+
   const [taskInput, setTaskInput] = useState('');
   const [showInput, setShowInput] = useState(false);
   const [showProofSheet, setShowProofSheet] = useState(false);
@@ -469,6 +475,7 @@ export default function HomeScreen() {
 
     if (type === 'skip') {
       try {
+        trackProofSkipped();
         await completeTask(completingTaskId);
         setShowProofSheet(false);
         setCompletingTaskId(null);
@@ -488,12 +495,15 @@ export default function HomeScreen() {
       });
 
       if (!result.canceled && result.assets[0]) {
+        const proofType = type === 'photo' ? 'photo' : 'screenshot';
+        trackProofUploaded(proofType);
         await completeTask(completingTaskId, {
-          type: type === 'photo' ? 'photo' : 'screenshot',
+          type: proofType,
           uri: result.assets[0].uri,
         });
         hadProof = true;
       } else {
+        trackProofSkipped();
         await completeTask(completingTaskId);
       }
     } catch (e) {

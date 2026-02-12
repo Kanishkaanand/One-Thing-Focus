@@ -1,8 +1,8 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect, useState, useCallback } from "react";
-import { View, Platform, LogBox } from "react-native";
+import React, { useEffect, useState, useCallback, useRef } from "react";
+import { View, Platform, LogBox, AppState, AppStateStatus } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -11,6 +11,7 @@ import Colors from "@/constants/colors";
 import { queryClient } from "@/lib/query-client";
 import { AppProvider, useApp } from "@/lib/AppContext";
 import { StatusBar } from "expo-status-bar";
+import { endSession } from "@/lib/analytics";
 import {
   useFonts,
   Nunito_400Regular,
@@ -50,6 +51,7 @@ function AppContent() {
   const [showLaunch, setShowLaunch] = useState(true);
   const [launchKey, setLaunchKey] = useState(0);
   const { setOnResetCallback } = useApp();
+  const appState = useRef(AppState.currentState);
 
   const triggerLaunch = useCallback(() => {
     setLaunchKey(k => k + 1);
@@ -60,6 +62,21 @@ function AppContent() {
     setOnResetCallback(() => triggerLaunch);
     return () => setOnResetCallback(null);
   }, [triggerLaunch, setOnResetCallback]);
+
+  // Track app state changes for session management
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (appState.current.match(/active/) && nextAppState.match(/inactive|background/)) {
+        // App going to background - end session
+        endSession();
+      }
+      appState.current = nextAppState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   return (
     <View style={{ flex: 1 }}>

@@ -14,6 +14,16 @@ import {
 } from './storage';
 import { syncNotifications, rescheduleAllReminders } from './notifications';
 import { validateTaskInput, validateNoteInput } from './validation';
+import {
+  initAnalytics,
+  trackAppOpened,
+  trackTaskCreated,
+  trackTaskCompleted,
+  trackDayCompleted,
+  trackLevelUp,
+  trackReflectionAdded,
+  trackDataReset,
+} from './analytics';
 
 interface AppContextValue {
   profile: UserProfile | null;
@@ -47,8 +57,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const loadData = useCallback(async () => {
     try {
+      // Initialize analytics on app load
+      await initAnalytics();
+
       let prof = await getProfile();
       const allEntries = await getAllEntries();
+
+      // Track app opened with days since last open
+      const lastEntry = Object.keys(allEntries).sort().pop();
+      const daysSinceLastOpen = lastEntry
+        ? Math.floor((Date.now() - new Date(lastEntry).getTime()) / (1000 * 60 * 60 * 24))
+        : undefined;
+      trackAppOpened(daysSinceLastOpen);
 
       const processed = await processEndOfDay(prof, allEntries);
       if (processed.currentLevel !== prof.currentLevel || processed.currentLevelStreak !== prof.currentLevelStreak) {
@@ -122,6 +142,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setTodayEntry(updated);
     setEntries(prev => ({ ...prev, [today]: updated }));
 
+    // Track task creation
+    trackTaskCreated(profile.currentLevel, updated.tasks.length);
+
     await syncNotifications(profile, updated);
   }, [profile, todayEntry]);
 
@@ -135,6 +158,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const allDone = updatedTasks.every(t => t.isCompleted);
     const completedCount = updatedTasks.filter(t => t.isCompleted).length;
 
+    // Track task completion
+    trackTaskCompleted(!!proof, proof?.type);
+
     let newProfile = { ...profile };
     newProfile.totalTasksCompleted = profile.totalTasksCompleted + 1;
 
@@ -144,8 +170,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
         newProfile.longestStreak = newProfile.currentLevelStreak;
       }
 
+      // Track day completed
+      trackDayCompleted(
+        newProfile.currentLevelStreak,
+        updatedTasks.length,
+        profile.currentLevel
+      );
+
       if (newProfile.currentLevelStreak >= 7 && newProfile.currentLevel < 3) {
         const newLevel = Math.min(newProfile.currentLevel + 1, 3) as 1 | 2 | 3;
+
+        // Track level up
+        trackLevelUp(profile.currentLevel, newLevel, newProfile.currentLevelStreak);
+
         newProfile.currentLevel = newLevel;
         newProfile.currentLevelStreak = 0;
         setJustLeveledUp(true);
@@ -187,15 +224,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await saveEntry(updated);
     setTodayEntry(updated);
     setEntries(prev => ({ ...prev, [todayEntry.date]: updated }));
+
+    // Track reflection added
+    trackReflectionAdded(mood, !!sanitizedNote);
   }, [todayEntry]);
 
   const resetAllData = useCallback(async () => {
+    // Track data reset before clearing
+    if (profile) {
+      trackDataReset(profile.currentLevelStreak, profile.totalTasksCompleted);
+    }
+
     await clearAllData();
     setJustLeveledUp(false);
     setYesterdayMissed(false);
     onResetCallback?.();
     await loadData();
-  }, [loadData, onResetCallback]);
+  }, [loadData, onResetCallback, profile]);
 
   const canAddMoreTasks = useMemo(() => {
     if (!profile || !todayEntry) return true;

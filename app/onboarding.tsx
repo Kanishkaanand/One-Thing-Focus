@@ -24,6 +24,8 @@ import OrganicCheck from '@/components/OrganicCheck';
 import { useApp } from '@/lib/AppContext';
 import { formatTime12h } from '@/lib/storage';
 import { requestNotificationPermissions } from '@/lib/notifications';
+import { useScreenAnalytics } from '@/lib/useAnalytics';
+import { trackOnboardingCompleted } from '@/lib/analytics';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -181,6 +183,9 @@ export default function OnboardingScreen() {
   const [permissionDenied, setPermissionDenied] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
+  // Track screen views
+  useScreenAnalytics('Onboarding');
+
   const handleNext = () => {
     if (currentIndex < slides.length - 1) {
       flatListRef.current?.scrollToIndex({ index: currentIndex + 1, animated: true });
@@ -206,6 +211,7 @@ export default function OnboardingScreen() {
         reminderPickTask: { enabled: true, time: pickTime },
         reminderCompleteTask: { enabled: true, time: completeTime },
       });
+      trackOnboardingCompleted(!!name.trim(), true);
       router.replace('/(tabs)');
     } else {
       setPermissionDenied(true);
@@ -216,6 +222,7 @@ export default function OnboardingScreen() {
         reminderPickTask: { enabled: false, time: pickTime },
         reminderCompleteTask: { enabled: false, time: completeTime },
       });
+      trackOnboardingCompleted(!!name.trim(), false);
       setTimeout(() => router.replace('/(tabs)'), 1500);
     }
   };
@@ -228,6 +235,7 @@ export default function OnboardingScreen() {
       reminderPickTask: { enabled: false, time: pickTime },
       reminderCompleteTask: { enabled: false, time: completeTime },
     });
+    trackOnboardingCompleted(!!name.trim(), false);
     router.replace('/(tabs)');
   };
 

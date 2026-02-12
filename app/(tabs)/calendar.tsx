@@ -15,6 +15,8 @@ import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/lib/AppContext';
 import { getTodayDate } from '@/lib/storage';
+import { useScreenAnalytics } from '@/lib/useAnalytics';
+import { trackEvent } from '@/lib/analytics';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -32,6 +34,9 @@ export default function CalendarScreen() {
   const insets = useSafeAreaInsets();
   const { entries, profile } = useApp();
   const today = getTodayDate();
+
+  // Track screen views
+  useScreenAnalytics('Calendar');
 
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
@@ -86,6 +91,7 @@ export default function CalendarScreen() {
     const entry = entries[dateStr];
     if (entry && entry.tasks.length > 0) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      trackEvent('calendar_day_viewed', { date: dateStr, wasCompleted: entry.completed });
       router.push({ pathname: '/day-detail', params: { date: dateStr } });
     }
   };
