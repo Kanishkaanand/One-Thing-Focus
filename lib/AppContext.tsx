@@ -18,7 +18,7 @@ import { createLogger } from './errorReporting';
 
 const logger = createLogger('AppContext');
 import { syncNotifications, rescheduleAllReminders } from './notifications';
-import { validateTaskInput, validateNoteInput } from './validation';
+import { validateTaskInput, validateNoteInput, validateMood, type MoodType } from './validation';
 import {
   initAnalytics,
   trackAppOpened,
@@ -223,6 +223,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addReflection = useCallback(async (mood: 'energized' | 'calm' | 'neutral' | 'tough', note?: string) => {
     if (!todayEntry) return;
 
+    // Runtime validate mood value (defense in depth)
+    const validatedMood = validateMood(mood);
+    if (!validatedMood) {
+      logger.error(new Error(`Invalid mood value: ${mood}`), 'addReflection');
+      throw new Error('Invalid mood value');
+    }
+
     // Validate and sanitize note if provided
     let sanitizedNote: string | undefined;
     if (note) {
@@ -235,14 +242,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const updated: DailyEntry = {
       ...todayEntry,
-      reflection: { mood, note: sanitizedNote },
+      reflection: { mood: validatedMood, note: sanitizedNote },
     };
     await saveEntry(updated);
     setTodayEntry(updated);
     setEntries(prev => ({ ...prev, [todayEntry.date]: updated }));
 
     // Track reflection added
-    trackReflectionAdded(mood, !!sanitizedNote);
+    trackReflectionAdded(validatedMood, !!sanitizedNote);
   }, [todayEntry]);
 
   const resetAllData = useCallback(async () => {

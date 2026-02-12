@@ -121,6 +121,90 @@ export function validateNoteInput(text: string): ValidationResult {
 }
 
 // ============================================
+// Runtime Type Validation
+// ============================================
+
+/**
+ * Valid mood types for reflection
+ */
+export const VALID_MOODS = ['energized', 'calm', 'neutral', 'tough'] as const;
+export type MoodType = typeof VALID_MOODS[number];
+
+/**
+ * Validates that a mood value is one of the allowed types
+ * @returns The valid mood or null if invalid
+ */
+export function validateMood(mood: unknown): MoodType | null {
+  if (typeof mood !== 'string') {
+    return null;
+  }
+  if (VALID_MOODS.includes(mood as MoodType)) {
+    return mood as MoodType;
+  }
+  return null;
+}
+
+/**
+ * Valid proof types
+ */
+export const VALID_PROOF_TYPES = ['photo', 'screenshot', 'document'] as const;
+export type ProofType = typeof VALID_PROOF_TYPES[number];
+
+/**
+ * Validates that a proof type is one of the allowed types
+ * @returns The valid proof type or null if invalid
+ */
+export function validateProofType(proofType: unknown): ProofType | null {
+  if (typeof proofType !== 'string') {
+    return null;
+  }
+  if (VALID_PROOF_TYPES.includes(proofType as ProofType)) {
+    return proofType as ProofType;
+  }
+  return null;
+}
+
+/**
+ * Valid level values
+ */
+export const VALID_LEVELS = [1, 2, 3] as const;
+export type LevelType = typeof VALID_LEVELS[number];
+
+/**
+ * Validates that a level value is one of the allowed types
+ * @returns The valid level or null if invalid
+ */
+export function validateLevel(level: unknown): LevelType | null {
+  if (typeof level !== 'number') {
+    return null;
+  }
+  if (VALID_LEVELS.includes(level as LevelType)) {
+    return level as LevelType;
+  }
+  return null;
+}
+
+/**
+ * Validates a date string is in YYYY-MM-DD format
+ */
+export function validateDateString(dateStr: unknown): string | null {
+  if (typeof dateStr !== 'string') {
+    return null;
+  }
+  // Check format: YYYY-MM-DD
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRegex.test(dateStr)) {
+    return null;
+  }
+  // Check it's a valid date
+  const date = new Date(dateStr + 'T12:00:00');
+  if (isNaN(date.getTime())) {
+    return null;
+  }
+  return dateStr;
+}
+
+// ============================================
 // Schema Validation Helpers
 // ============================================
 

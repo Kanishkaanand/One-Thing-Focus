@@ -45,6 +45,7 @@ import {
   type ProofOption,
   type MoodType,
 } from '@/components/modals';
+import StorageWarningBanner from '@/components/StorageWarningBanner';
 
 const logger = createLogger('HomeScreen');
 
@@ -379,6 +380,7 @@ export default function HomeScreen() {
     justLeveledUp,
     setJustLeveledUp,
     isLoading,
+    storageStatus,
   } = useApp();
 
   // Track screen views
@@ -390,6 +392,7 @@ export default function HomeScreen() {
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
   const [showReflection, setShowReflection] = useState(false);
   const [reflectionNote, setReflectionNote] = useState('');
+  const [showStorageWarning, setShowStorageWarning] = useState(true);
   const [showCelebration, setShowCelebration] = useState(false);
   const [proofViewUri, setProofViewUri] = useState<string | null>(null);
   const [playAnimation, setPlayAnimation] = useState(false);
@@ -629,6 +632,13 @@ export default function HomeScreen() {
           </View>
           <Text style={styles.levelDaysText}>Day {Math.min(streakDays, 7)} of 7</Text>
         </Animated.View>
+
+        {showStorageWarning && storageStatus && (storageStatus.isWarning || storageStatus.isCritical) && (
+          <StorageWarningBanner
+            storageStatus={storageStatus}
+            onDismiss={() => setShowStorageWarning(false)}
+          />
+        )}
 
         {yesterdayMissed && (
           <Animated.View entering={FadeInDown.delay(300)} style={styles.missedBanner}>

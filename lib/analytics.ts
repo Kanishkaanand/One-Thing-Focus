@@ -4,6 +4,11 @@
  * Local-first analytics tracking for understanding user behavior.
  * Events are stored locally in AsyncStorage and can optionally be synced to a backend.
  *
+ * Features:
+ * - Batched writes to reduce storage I/O
+ * - Rate limiting to prevent event flooding
+ * - Automatic persistence on app background
+ *
  * Privacy considerations:
  * - No PII (task text, notes, names) is stored
  * - Only event types and aggregated metrics
@@ -47,13 +52,24 @@ const ANALYTICS_EVENTS_KEY = '@onething_analytics_events';
 const ANALYTICS_SESSION_KEY = '@onething_analytics_session';
 const MAX_EVENTS = 1000; // Keep last 1000 events
 
+// Batching configuration
+const BATCH_SIZE = 10; // Persist after this many events
+const BATCH_INTERVAL_MS = 30000; // Or after 30 seconds
+const RATE_LIMIT_MS = 100; // Minimum time between events of same type
+const MAX_EVENTS_PER_MINUTE = 60; // Rate limit: max events per minute
+
 // ============================================
 // State
 // ============================================
 
 let currentSession: AnalyticsSession | null = null;
 let eventQueue: AnalyticsEvent[] = [];
+let pendingEvents: AnalyticsEvent[] = []; // Events not yet persisted
 let isInitialized = false;
+let batchTimeout: ReturnType<typeof setTimeout> | null = null;
+let lastEventTimes: Record<string, number> = {}; // For rate limiting by event type
+let eventsThisMinute = 0;
+let minuteResetTimeout: ReturnType<typeof setTimeout> | null = null;
 
 // ============================================
 // Utility Functions
@@ -124,16 +140,108 @@ export async function endSession(): Promise<void> {
     eventCount: currentSession.eventCount,
   });
 
+  // Flush any remaining events before session ends
+  await flushEvents();
+
   currentSession = null;
 }
 
 /**
- * Track an analytics event
+ * Check if event should be rate limited
+ */
+function shouldRateLimit(eventName: string): boolean {
+  const now = Date.now();
+
+  // Check global rate limit (events per minute)
+  if (eventsThisMinute >= MAX_EVENTS_PER_MINUTE) {
+    return true;
+  }
+
+  // Check per-event-type rate limit
+  const lastTime = lastEventTimes[eventName];
+  if (lastTime && now - lastTime < RATE_LIMIT_MS) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Schedule batch persistence
+ */
+function scheduleBatchPersist(): void {
+  // Clear existing timeout
+  if (batchTimeout) {
+    clearTimeout(batchTimeout);
+  }
+
+  // Schedule new timeout
+  batchTimeout = setTimeout(() => {
+    flushEvents();
+  }, BATCH_INTERVAL_MS);
+}
+
+/**
+ * Reset per-minute event counter
+ */
+function resetMinuteCounter(): void {
+  eventsThisMinute = 0;
+  if (minuteResetTimeout) {
+    clearTimeout(minuteResetTimeout);
+  }
+  minuteResetTimeout = setTimeout(resetMinuteCounter, 60000);
+}
+
+/**
+ * Flush pending events to storage
+ */
+export async function flushEvents(): Promise<void> {
+  if (pendingEvents.length === 0) return;
+
+  try {
+    // Add pending to main queue
+    eventQueue.push(...pendingEvents);
+    pendingEvents = [];
+
+    // Trim if over limit
+    if (eventQueue.length > MAX_EVENTS) {
+      eventQueue = eventQueue.slice(-MAX_EVENTS);
+    }
+
+    // Persist to storage
+    await AsyncStorage.setItem(ANALYTICS_EVENTS_KEY, JSON.stringify(eventQueue));
+  } catch (e) {
+    // On error, keep pending events for next flush attempt
+    console.error('Failed to persist analytics events:', e);
+  }
+
+  // Clear batch timeout
+  if (batchTimeout) {
+    clearTimeout(batchTimeout);
+    batchTimeout = null;
+  }
+}
+
+/**
+ * Track an analytics event with batching and rate limiting
  */
 export async function trackEvent(
   name: string,
   properties?: Record<string, unknown>
 ): Promise<void> {
+  // Initialize minute counter if needed
+  if (minuteResetTimeout === null) {
+    resetMinuteCounter();
+  }
+
+  // Check rate limiting (skip session events to ensure they're always tracked)
+  if (!name.startsWith('session_') && shouldRateLimit(name)) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[Analytics] Rate limited: ${name}`);
+    }
+    return;
+  }
+
   // Ensure we have a session
   if (!currentSession) {
     await startSession();
@@ -147,25 +255,25 @@ export async function trackEvent(
     sessionId: currentSession!.id,
   };
 
-  // Add to queue
-  eventQueue.push(event);
+  // Update rate limiting state
+  lastEventTimes[name] = Date.now();
+  eventsThisMinute++;
+
+  // Add to pending queue (not yet persisted)
+  pendingEvents.push(event);
   currentSession!.eventCount++;
-
-  // Trim if over limit
-  if (eventQueue.length > MAX_EVENTS) {
-    eventQueue = eventQueue.slice(-MAX_EVENTS);
-  }
-
-  // Persist to storage
-  try {
-    await AsyncStorage.setItem(ANALYTICS_EVENTS_KEY, JSON.stringify(eventQueue));
-  } catch (e) {
-    console.error('Failed to persist analytics event:', e);
-  }
 
   // Log in development
   if (process.env.NODE_ENV === 'development') {
     console.log(`[Analytics] ${name}`, properties || '');
+  }
+
+  // Persist immediately for important events, otherwise batch
+  const importantEvents = ['session_started', 'session_ended', 'app_opened', 'task_completed', 'day_completed', 'level_up'];
+  if (importantEvents.includes(name) || pendingEvents.length >= BATCH_SIZE) {
+    await flushEvents();
+  } else {
+    scheduleBatchPersist();
   }
 }
 
