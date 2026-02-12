@@ -6,7 +6,7 @@ module.exports = {
     '^.+\\.(ts|tsx)$': ['babel-jest', { presets: ['@babel/preset-typescript'] }],
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(zod)/)',
+    'node_modules/(?!(zod|uuid)/)',
   ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',

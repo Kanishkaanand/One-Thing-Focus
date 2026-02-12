@@ -11,7 +11,12 @@ import {
   generateId,
   processEndOfDay,
   clearAllData,
+  checkStorageQuota,
+  StorageStatus,
 } from './storage';
+import { createLogger } from './errorReporting';
+
+const logger = createLogger('AppContext');
 import { syncNotifications, rescheduleAllReminders } from './notifications';
 import { validateTaskInput, validateNoteInput } from './validation';
 import {
@@ -30,6 +35,7 @@ interface AppContextValue {
   todayEntry: DailyEntry | null;
   entries: Record<string, DailyEntry>;
   isLoading: boolean;
+  storageStatus: StorageStatus | null;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   addTask: (text: string) => Promise<void>;
   completeTask: (taskId: string, proof?: TaskItem['proof']) => Promise<void>;
@@ -54,6 +60,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [yesterdayMissed, setYesterdayMissed] = useState(false);
   const [justLeveledUp, setJustLeveledUp] = useState(false);
   const [onResetCallback, setOnResetCallback] = useState<(() => void) | null>(null);
+  const [storageStatus, setStorageStatus] = useState<StorageStatus | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -90,8 +97,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setTodayEntry(currentTodayEntry);
 
       await syncNotifications(prof, currentTodayEntry);
+
+      // Check storage quota
+      const quota = await checkStorageQuota();
+      setStorageStatus(quota);
+      if (quota.isCritical) {
+        logger.error(new Error(`Storage critically full: ${quota.percentUsed}%`), 'checkStorageQuota');
+      } else if (quota.isWarning) {
+        logger.warn(`Storage warning: ${quota.percentUsed}% used`);
+      }
     } catch (e) {
-      console.error('Failed to load data:', e);
+      logger.error(e instanceof Error ? e : new Error(String(e)), 'loadData');
     } finally {
       setIsLoading(false);
     }
@@ -253,6 +269,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     todayEntry,
     entries,
     isLoading,
+    storageStatus,
     updateProfile,
     addTask,
     completeTask,
@@ -265,7 +282,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setJustLeveledUp,
     onResetCallback,
     setOnResetCallback,
-  }), [profile, todayEntry, entries, isLoading, updateProfile, addTask, completeTask, addReflection, canAddMoreTasks, loadData, resetAllData, yesterdayMissed, justLeveledUp, onResetCallback]);
+  }), [profile, todayEntry, entries, isLoading, storageStatus, updateProfile, addTask, completeTask, addReflection, canAddMoreTasks, loadData, resetAllData, yesterdayMissed, justLeveledUp, onResetCallback]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

@@ -1,9 +1,13 @@
 /**
  * Error Reporting Utility
  *
- * A lightweight error logging system that can be extended to integrate
- * with external services like Sentry, Bugsnag, etc.
+ * A production-ready error logging system that:
+ * - Captures errors with context and severity
+ * - Persists critical errors to AsyncStorage
+ * - Can be extended to integrate with Sentry, Bugsnag, etc.
  */
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type ErrorSeverity = 'info' | 'warning' | 'error' | 'fatal';
 
@@ -15,16 +19,29 @@ export interface ErrorContext {
 }
 
 interface ErrorLogEntry {
+  id: string;
   timestamp: string;
   severity: ErrorSeverity;
   message: string;
-  error?: Error;
+  stack?: string;
   context?: ErrorContext;
 }
 
-// In-memory log buffer (in production, this could be persisted or sent to a service)
+// Storage key for persisted errors
+const ERROR_LOG_KEY = '@onething_error_log';
+
+// In-memory log buffer
 const errorLog: ErrorLogEntry[] = [];
 const MAX_LOG_SIZE = 100;
+const MAX_PERSISTED_ERRORS = 50;
+
+// Check if we're in development mode
+const isDev = process.env.NODE_ENV === 'development';
+
+// Generate simple ID for error entries
+function generateErrorId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+}
 
 /**
  * Log an error with context
@@ -35,10 +52,11 @@ export function logError(
   context?: ErrorContext
 ): void {
   const entry: ErrorLogEntry = {
+    id: generateErrorId(),
     timestamp: new Date().toISOString(),
     severity,
     message: typeof error === 'string' ? error : error.message,
-    error: typeof error === 'string' ? undefined : error,
+    stack: typeof error === 'string' ? undefined : error.stack,
     context,
   };
 
@@ -49,7 +67,7 @@ export function logError(
   }
 
   // Console output in development
-  if (__DEV__) {
+  if (isDev) {
     const prefix = `[${severity.toUpperCase()}]`;
     const contextStr = context ? ` (${context.component || 'unknown'}${context.action ? `:${context.action}` : ''})` : '';
 
@@ -62,13 +80,62 @@ export function logError(
         break;
       case 'error':
       case 'fatal':
-        console.error(prefix, entry.message, contextStr, entry.error?.stack || '', context?.metadata || '');
+        console.error(prefix, entry.message, contextStr, entry.stack || '', context?.metadata || '');
         break;
     }
   }
 
+  // Persist error and fatal severity to storage for later analysis
+  if (severity === 'error' || severity === 'fatal') {
+    persistError(entry).catch(() => {
+      // Silent fail - don't create infinite loop if storage fails
+    });
+  }
+
   // In production, this is where you'd send to an external service
   // Example: Sentry.captureException(error, { extra: context });
+}
+
+/**
+ * Persist error to AsyncStorage for later retrieval
+ */
+async function persistError(entry: ErrorLogEntry): Promise<void> {
+  try {
+    const existing = await AsyncStorage.getItem(ERROR_LOG_KEY);
+    const errors: ErrorLogEntry[] = existing ? JSON.parse(existing) : [];
+
+    errors.push(entry);
+
+    // Keep only the most recent errors
+    const trimmed = errors.slice(-MAX_PERSISTED_ERRORS);
+
+    await AsyncStorage.setItem(ERROR_LOG_KEY, JSON.stringify(trimmed));
+  } catch {
+    // Silent fail
+  }
+}
+
+/**
+ * Get persisted errors from storage
+ */
+export async function getPersistedErrors(): Promise<ErrorLogEntry[]> {
+  try {
+    const data = await AsyncStorage.getItem(ERROR_LOG_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Clear persisted errors
+ */
+export async function clearPersistedErrors(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(ERROR_LOG_KEY);
+  } catch {
+    // Silent fail
+  }
 }
 
 /**

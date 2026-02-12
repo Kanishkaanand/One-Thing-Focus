@@ -28,10 +28,11 @@ import Animated, {
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import Colors from '@/constants/colors';
 import OrganicCheck from '@/components/OrganicCheck';
 import { useApp } from '@/lib/AppContext';
-import { DailyEntry, saveEntry, TaskItem } from '@/lib/storage';
+import { DailyEntry, saveEntry, TaskItem, isImageSizeValid, getMaxImageSize } from '@/lib/storage';
 import { getGreeting, formatDate, getTodayDate, getStreakMessage } from '@/lib/storage';
 import { createLogger } from '@/lib/errorReporting';
 import { useScreenAnalytics } from '@/lib/useAnalytics';
@@ -495,11 +496,36 @@ export default function HomeScreen() {
       });
 
       if (!result.canceled && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+
+        // Validate image size before saving
+        try {
+          const fileInfo = await FileSystem.getInfoAsync(imageUri);
+          if (fileInfo.exists && 'size' in fileInfo && fileInfo.size) {
+            if (!isImageSizeValid(fileInfo.size)) {
+              // Image too large - show error and complete without proof
+              const maxSizeMB = (getMaxImageSize() / (1024 * 1024)).toFixed(1);
+              logger.warn(`Image too large: ${(fileInfo.size / (1024 * 1024)).toFixed(1)}MB (max ${maxSizeMB}MB)`);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+              // Complete task without proof since image is too large
+              trackProofSkipped();
+              await completeTask(completingTaskId);
+              setShowProofSheet(false);
+              setCompletingTaskId(null);
+              checkForCompletion(false);
+              return;
+            }
+          }
+        } catch (sizeError) {
+          // If we can't check size, proceed anyway but log warning
+          logger.warn('Could not verify image size, proceeding anyway');
+        }
+
         const proofType = type === 'photo' ? 'photo' : 'screenshot';
         trackProofUploaded(proofType);
         await completeTask(completingTaskId, {
           type: proofType,
-          uri: result.assets[0].uri,
+          uri: imageUri,
         });
         hadProof = true;
       } else {

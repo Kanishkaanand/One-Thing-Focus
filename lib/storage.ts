@@ -1,5 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { v4 as uuidv4 } from 'uuid';
 import { parseUserProfile, parseEntries } from './validation';
+import { createLogger } from './errorReporting';
+
+const logger = createLogger('Storage');
 
 export interface ReminderConfig {
   enabled: boolean;
@@ -48,6 +52,11 @@ export interface DailyEntry {
 const PROFILE_KEY = '@onething_profile';
 const ENTRIES_KEY = '@onething_entries';
 
+// Storage quota constants (AsyncStorage limit is ~6MB on Android, ~10MB on iOS)
+const STORAGE_WARNING_THRESHOLD = 5 * 1024 * 1024; // 5MB warning
+const STORAGE_CRITICAL_THRESHOLD = 8 * 1024 * 1024; // 8MB critical
+const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB max per image
+
 const defaultProfile: UserProfile = {
   name: '',
   createdAt: new Date().toISOString(),
@@ -71,29 +80,48 @@ const defaultProfile: UserProfile = {
 export async function getProfile(): Promise<UserProfile> {
   try {
     const data = await AsyncStorage.getItem(PROFILE_KEY);
-    if (!data) return { ...defaultProfile };
-    const parsed = JSON.parse(data);
+    if (!data) return { ...defaultProfile, createdAt: new Date().toISOString() };
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(data);
+    } catch (parseError) {
+      // JSON is corrupted - log and return fresh defaults
+      logger.error(parseError instanceof Error ? parseError : new Error('JSON parse failed'), 'getProfile.parse');
+      return { ...defaultProfile, createdAt: new Date().toISOString() };
+    }
 
     // Merge with defaults first to ensure all fields exist
+    const parsedObj = typeof parsed === 'object' && parsed !== null ? parsed as Record<string, unknown> : {};
+    const reminderPick = parsedObj.reminderPickTask;
+    const reminderComplete = parsedObj.reminderCompleteTask;
+
     const merged = {
       ...defaultProfile,
-      ...parsed,
-      reminderPickTask: { ...defaultProfile.reminderPickTask, ...(parsed.reminderPickTask || {}) },
-      reminderCompleteTask: { ...defaultProfile.reminderCompleteTask, ...(parsed.reminderCompleteTask || {}) },
+      ...parsedObj,
+      reminderPickTask: {
+        ...defaultProfile.reminderPickTask,
+        ...(typeof reminderPick === 'object' && reminderPick !== null ? reminderPick as Record<string, unknown> : {}),
+      },
+      reminderCompleteTask: {
+        ...defaultProfile.reminderCompleteTask,
+        ...(typeof reminderComplete === 'object' && reminderComplete !== null ? reminderComplete as Record<string, unknown> : {}),
+      },
     };
 
-    // Validate with Zod schema
+    // Validate with Zod schema - ONLY return if valid
     const validated = parseUserProfile(merged);
     if (validated) {
       return validated;
     }
 
-    // If validation fails, return merged data (backwards compatibility)
-    console.warn('Profile validation failed, using merged defaults');
-    return merged;
+    // Validation failed - data is corrupted, return clean defaults
+    // This prevents corrupted data from propagating through the app
+    logger.warn('Profile validation failed, returning fresh defaults');
+    return { ...defaultProfile, createdAt: new Date().toISOString() };
   } catch (e) {
-    console.error('Failed to parse profile data:', e);
-    return { ...defaultProfile };
+    logger.error(e instanceof Error ? e : new Error(String(e)), 'getProfile');
+    return { ...defaultProfile, createdAt: new Date().toISOString() };
   }
 }
 
@@ -105,12 +133,31 @@ export async function getAllEntries(): Promise<Record<string, DailyEntry>> {
   try {
     const data = await AsyncStorage.getItem(ENTRIES_KEY);
     if (!data) return {};
-    const parsed = JSON.parse(data);
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(data);
+    } catch (parseError) {
+      // JSON is corrupted - log and return empty (data loss, but prevents crash)
+      logger.error(parseError instanceof Error ? parseError : new Error('Entries JSON parse failed'), 'getAllEntries.parse');
+      return {};
+    }
 
     // Validate entries with Zod schema (filters out invalid entries)
-    return parseEntries(parsed);
+    const validEntries = parseEntries(parsed);
+
+    // Log if we had to drop any entries
+    if (typeof parsed === 'object' && parsed !== null) {
+      const originalCount = Object.keys(parsed).length;
+      const validCount = Object.keys(validEntries).length;
+      if (validCount < originalCount) {
+        logger.warn(`Dropped ${originalCount - validCount} invalid entries during validation`);
+      }
+    }
+
+    return validEntries;
   } catch (e) {
-    console.error('Failed to parse entries data:', e);
+    logger.error(e instanceof Error ? e : new Error(String(e)), 'getAllEntries');
     return {};
   }
 }
@@ -162,12 +209,75 @@ export function getStreakMessage(streak: number): string {
   return `${streak} days. Extraordinary.`;
 }
 
+/**
+ * Generate a cryptographically secure unique ID using UUID v4
+ */
 export function generateId(): string {
-  return Date.now().toString() + Math.random().toString(36).substr(2, 9);
+  return uuidv4();
 }
 
 export async function clearAllData(): Promise<void> {
   await AsyncStorage.multiRemove([PROFILE_KEY, ENTRIES_KEY]);
+}
+
+// ============================================
+// Storage Quota Management
+// ============================================
+
+export interface StorageStatus {
+  totalBytes: number;
+  isWarning: boolean;
+  isCritical: boolean;
+  percentUsed: number;
+}
+
+/**
+ * Check current storage usage and return status
+ */
+export async function checkStorageQuota(): Promise<StorageStatus> {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    let totalBytes = 0;
+
+    for (const key of keys) {
+      const value = await AsyncStorage.getItem(key);
+      if (value) {
+        // Approximate byte size (2 bytes per char for Unicode)
+        totalBytes += value.length * 2;
+      }
+    }
+
+    const percentUsed = Math.round((totalBytes / STORAGE_CRITICAL_THRESHOLD) * 100);
+
+    return {
+      totalBytes,
+      isWarning: totalBytes >= STORAGE_WARNING_THRESHOLD,
+      isCritical: totalBytes >= STORAGE_CRITICAL_THRESHOLD,
+      percentUsed: Math.min(percentUsed, 100),
+    };
+  } catch (e) {
+    logger.error(e instanceof Error ? e : new Error(String(e)), 'checkStorageQuota');
+    return {
+      totalBytes: 0,
+      isWarning: false,
+      isCritical: false,
+      percentUsed: 0,
+    };
+  }
+}
+
+/**
+ * Get the maximum allowed image size in bytes
+ */
+export function getMaxImageSize(): number {
+  return MAX_IMAGE_SIZE;
+}
+
+/**
+ * Validate that an image size is within allowed limits
+ */
+export function isImageSizeValid(sizeInBytes: number): boolean {
+  return sizeInBytes <= MAX_IMAGE_SIZE;
 }
 
 export async function processEndOfDay(profile: UserProfile, entries: Record<string, DailyEntry>): Promise<UserProfile> {

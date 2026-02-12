@@ -105,15 +105,15 @@ describe('generateId', () => {
     expect(typeof id).toBe('string');
   });
 
-  it('should generate IDs with timestamp prefix', () => {
-    const beforeTime = Date.now().toString();
-    const id = generateId();
-    const afterTime = Date.now().toString();
+  it('should generate unique IDs each time', () => {
+    const id1 = generateId();
+    const id2 = generateId();
+    const id3 = generateId();
 
-    // ID should start with a timestamp in the valid range
-    const idTimestamp = id.substring(0, beforeTime.length);
-    expect(parseInt(idTimestamp)).toBeGreaterThanOrEqual(parseInt(beforeTime));
-    expect(parseInt(idTimestamp)).toBeLessThanOrEqual(parseInt(afterTime));
+    // Each ID should be unique
+    expect(id1).not.toBe(id2);
+    expect(id2).not.toBe(id3);
+    expect(id1).not.toBe(id3);
   });
 });
 

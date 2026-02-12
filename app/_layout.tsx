@@ -12,6 +12,7 @@ import { queryClient } from "@/lib/query-client";
 import { AppProvider, useApp } from "@/lib/AppContext";
 import { StatusBar } from "expo-status-bar";
 import { endSession } from "@/lib/analytics";
+import { logError, captureException } from "@/lib/errorReporting";
 import {
   useFonts,
   Nunito_400Regular,
@@ -89,21 +90,51 @@ function AppContent() {
   );
 }
 
-// Global error handler for unhandled promise rejections
+// Global error handler for unhandled errors and promise rejections
 function setupGlobalErrorHandlers() {
-  // Handle unhandled promise rejections
-  const originalHandler = ErrorUtils.getGlobalHandler();
+  try {
+    // Handle unhandled errors (React Native)
+    const originalHandler = ErrorUtils.getGlobalHandler();
 
-  ErrorUtils.setGlobalHandler((error, isFatal) => {
-    console.error('Global error caught:', error, 'Fatal:', isFatal);
-    // Call original handler
-    originalHandler?.(error, isFatal);
-  });
+    ErrorUtils.setGlobalHandler((error, isFatal) => {
+      // Log to our error reporting system
+      try {
+        const errorObj = error instanceof Error ? error : new Error(String(error));
+        logError(errorObj, isFatal ? 'fatal' : 'error', {
+          component: 'GlobalErrorHandler',
+          action: 'unhandledError',
+          metadata: { isFatal },
+        });
+      } catch {
+        // Last resort: at least try console
+        console.error('Global error caught:', error, 'Fatal:', isFatal);
+      }
+
+      // Call original handler with try-catch to prevent crashes
+      try {
+        originalHandler?.(error, isFatal);
+      } catch (handlerError) {
+        console.error('Original error handler failed:', handlerError);
+      }
+    });
+  } catch (setupError) {
+    console.error('Failed to set up global error handler:', setupError);
+  }
 
   // For web platform
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     window.addEventListener('unhandledrejection', (event) => {
-      console.error('Unhandled Promise Rejection:', event.reason);
+      try {
+        const error = event.reason instanceof Error
+          ? event.reason
+          : new Error(String(event.reason));
+        captureException(error, {
+          component: 'GlobalErrorHandler',
+          action: 'unhandledRejection',
+        });
+      } catch {
+        console.error('Unhandled Promise Rejection:', event.reason);
+      }
     });
   }
 }
