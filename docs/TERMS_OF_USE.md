@@ -24,5 +24,4 @@ To the maximum extent permitted by law, One Thing is not liable for indirect, in
 These terms may be updated over time. Continued use of the app after updates means you accept the revised terms.
 
 ## Contact
-For support or legal questions, contact: support@example.com
-
+For support or legal questions, contact: kanishka.anand89@gmail.com

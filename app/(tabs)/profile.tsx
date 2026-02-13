@@ -31,8 +31,12 @@ import { trackReminderToggled } from '@/lib/analytics';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES = [0, 15, 30, 45];
-const PRIVACY_POLICY_URL = process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL || 'https://example.com/privacy';
-const TERMS_URL = process.env.EXPO_PUBLIC_TERMS_URL || 'https://example.com/terms';
+const PRIVACY_POLICY_URL =
+  process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ||
+  'https://github.com/Kanishkaanand/One-Thing-Focus/blob/main/docs/PRIVACY_POLICY.md';
+const TERMS_URL =
+  process.env.EXPO_PUBLIC_TERMS_URL ||
+  'https://github.com/Kanishkaanand/One-Thing-Focus/blob/main/docs/TERMS_OF_USE.md';
 
 function StatCard({ icon, label, value, delay }: { icon: string; label: string; value: string | number; delay: number }) {
   return (

@@ -37,5 +37,4 @@ If you grant photo library permission, One Thing can read selected images so you
 One Thing is not directed to children under 13.
 
 ## Contact
-For privacy requests or questions, contact: support@example.com
-
+For privacy requests or questions, contact: kanishka.anand89@gmail.com

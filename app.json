@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.onething.app",
+      "bundleIdentifier": "com.kanishkaanand.onethingfocus",
       "buildNumber": "1",
       "infoPlist": {
         "NSUserNotificationUsageDescription": "One Thing uses notifications to remind you to pick and complete your daily task.",
@@ -23,7 +23,7 @@
       }
     },
     "android": {
-      "package": "com.onething.app",
+      "package": "com.kanishkaanand.onethingfocus",
       "versionCode": 1,
       "permissions": [
         "android.permission.POST_NOTIFICATIONS",
