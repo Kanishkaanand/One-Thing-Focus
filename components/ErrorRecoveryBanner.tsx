@@ -7,7 +7,7 @@
  * - Report the error (future feature)
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,6 @@ import {
   Animated,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import Colors from '@/constants/colors';
 
 export type ErrorSeverity = 'warning' | 'error';
 
@@ -38,6 +37,17 @@ export default function ErrorRecoveryBanner({
   const [fadeAnim] = useState(new Animated.Value(0));
   const [visible, setVisible] = useState(true);
 
+  const handleDismiss = useCallback(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      setVisible(false);
+      onDismiss?.();
+    });
+  }, [fadeAnim, onDismiss]);
+
   useEffect(() => {
     // Fade in
     Animated.timing(fadeAnim, {
@@ -53,18 +63,7 @@ export default function ErrorRecoveryBanner({
       }, autoDismissMs);
       return () => clearTimeout(timer);
     }
-  }, []);
-
-  const handleDismiss = () => {
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start(() => {
-      setVisible(false);
-      onDismiss?.();
-    });
-  };
+  }, [autoDismissMs, fadeAnim, handleDismiss]);
 
   if (!visible) return null;
 

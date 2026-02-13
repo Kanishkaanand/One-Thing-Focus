@@ -251,7 +251,7 @@ export default function OnboardingScreen() {
           </View>
           <Text style={styles.reminderTitle}>Stay on track, gently.</Text>
           <Text style={styles.reminderSubtitle}>
-            We'll send you two quiet nudges each day — one to pick your task, one to finish it.
+            We&apos;ll send you two quiet nudges each day - one to pick your task, one to finish it.
           </Text>
 
           <View style={styles.reminderOptions}>

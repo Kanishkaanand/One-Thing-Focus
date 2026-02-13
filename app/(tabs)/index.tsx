@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
+import React, { useState, useEffect, useRef, memo } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,6 @@ import { router } from 'expo-router';
 import Animated, {
   FadeIn,
   FadeInDown,
-  SlideInUp,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -23,7 +22,6 @@ import Animated, {
   withTiming,
   withDelay,
   Easing,
-  interpolate,
 } from 'react-native-reanimated';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -32,8 +30,17 @@ import * as FileSystem from 'expo-file-system';
 import Colors from '@/constants/colors';
 import OrganicCheck from '@/components/OrganicCheck';
 import { useApp } from '@/lib/AppContext';
-import { DailyEntry, saveEntry, TaskItem, isImageSizeValid, getMaxImageSize } from '@/lib/storage';
-import { getGreeting, formatDate, getTodayDate, getStreakMessage } from '@/lib/storage';
+import {
+  DailyEntry,
+  saveEntry,
+  TaskItem,
+  isImageSizeValid,
+  getMaxImageSize,
+  getGreeting,
+  formatDate,
+  getTodayDate,
+  getStreakMessage,
+} from '@/lib/storage';
 import { createLogger } from '@/lib/errorReporting';
 import { useScreenAnalytics } from '@/lib/useAnalytics';
 import { trackProofUploaded, trackProofSkipped } from '@/lib/analytics';
@@ -101,7 +108,7 @@ function AnimatedCheckmark({ animate, delay: startDelay }: { animate: boolean; d
     } else {
       pulseScale.value = 1;
     }
-  }, [animate]);
+  }, [animate, pulseScale, startDelay]);
 
   const containerStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulseScale.value }],
@@ -136,7 +143,7 @@ const CompletedTaskCard = memo(function CompletedTaskCard({
     if (animate) {
       borderOpacity.value = withDelay(300, withTiming(1, { duration: 400 }));
     }
-  }, [animate]);
+  }, [animate, borderOpacity]);
 
   const borderStyle = useAnimatedStyle(() => ({
     opacity: borderOpacity.value,
@@ -250,7 +257,7 @@ function FloatingParticle({ delay, startX, emoji }: { delay: number; startX: num
     translateY.value = withDelay(delay, withTiming(-180, { duration: 2100, easing: Easing.out(Easing.cubic) }));
     translateX.value = withDelay(delay, withTiming(startX + (Math.random() - 0.5) * 60, { duration: 2100 }));
     rotate.value = withDelay(delay, withTiming((Math.random() - 0.5) * 40, { duration: 2100 }));
-  }, []);
+  }, [delay, opacity, rotate, startX, translateX, translateY]);
 
   const style = useAnimatedStyle(() => ({
     position: 'absolute' as const,
@@ -277,22 +284,23 @@ function CelebrationOverlay({ visible, streak, leveledUp, onDismiss }: {
   leveledUp: boolean;
   onDismiss: () => void;
 }) {
-  if (!visible) return null;
-
-  const streakMsg = getStreakMessage(streak);
   const celebScale = useSharedValue(0);
 
   useEffect(() => {
+    if (!visible) return;
     celebScale.value = withDelay(100, withSequence(
       withSpring(1.15, { damping: 6, stiffness: 120 }),
       withSpring(1, { damping: 12 })
     ));
-  }, []);
+  }, [celebScale, visible]);
 
   const iconAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: celebScale.value }],
   }));
 
+  if (!visible) return null;
+
+  const streakMsg = getStreakMessage(streak);
   const particles = Array.from({ length: 8 }, (_, i) => ({
     delay: 200 + i * 120,
     startX: (i - 4) * 30,
@@ -371,7 +379,6 @@ export default function HomeScreen() {
   const {
     profile,
     todayEntry,
-    entries,
     addTask,
     completeTask,
     addReflection,
@@ -402,7 +409,6 @@ export default function HomeScreen() {
 
   const allDone = (todayEntry?.tasks?.length ?? 0) > 0 && (todayEntry?.tasks?.every(t => t.isCompleted) ?? false);
   const hasTasks = (todayEntry?.tasks?.length ?? 0) > 0;
-  const someDone = hasTasks && !allDone && todayEntry!.tasks.some(t => t.isCompleted);
 
   const messageOpacity = useSharedValue(0);
   const reflectionOpacity = useSharedValue(0);
@@ -447,7 +453,15 @@ export default function HomeScreen() {
         setPlayAnimation(false);
       }
     }
-  }, [allDone, todayEntry?.completed]);
+  }, [
+    allDone,
+    todayEntry,
+    profile?.currentLevelStreak,
+    justLeveledUp,
+    footerOpacity,
+    messageOpacity,
+    reflectionOpacity,
+  ]);
 
   useEffect(() => {
     if (!isLoading && profile && !profile.onboardingComplete) {
@@ -519,7 +533,7 @@ export default function HomeScreen() {
               return;
             }
           }
-        } catch (sizeError) {
+        } catch {
           // If we can't check size, proceed anyway but log warning
           logger.warn('Could not verify image size, proceeding anyway');
         }
@@ -643,7 +657,7 @@ export default function HomeScreen() {
         {yesterdayMissed && (
           <Animated.View entering={FadeInDown.delay(300)} style={styles.missedBanner}>
             <Text style={styles.missedText}>
-              Yesterday didn't go as planned — that's completely okay. Every day is a fresh start.
+              Yesterday didn&apos;t go as planned - that&apos;s completely okay. Every day is a fresh start.
             </Text>
           </Animated.View>
         )}
@@ -686,7 +700,7 @@ export default function HomeScreen() {
                 </View>
                 {todayEntry.reflection.note ? (
                   <Text style={styles.journalNote}>
-                    "{todayEntry.reflection.note}"
+                    &quot;{todayEntry.reflection.note}&quot;
                   </Text>
                 ) : null}
               </Animated.View>
@@ -736,9 +750,9 @@ export default function HomeScreen() {
             <View style={styles.emptyIconWrap}>
               <OrganicCheck size={56} color={Colors.accent} showCircle={true} />
             </View>
-            <Text style={styles.emptyTitle}>What's your one thing today?</Text>
+            <Text style={styles.emptyTitle}>What&apos;s your one thing today?</Text>
             <Text style={styles.emptySubtitle}>
-              Focus on just one task. That's all it takes.
+              Focus on just one task. That&apos;s all it takes.
             </Text>
             <Pressable
               style={({ pressed }) => [styles.addButton, pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] }]}

@@ -87,7 +87,7 @@ export default function DayDetailScreen() {
               <Text style={styles.moodText}>{moodInfo.label}</Text>
             </View>
             {entry.reflection.note && (
-              <Text style={styles.noteText}>"{entry.reflection.note}"</Text>
+              <Text style={styles.noteText}>&quot;{entry.reflection.note}&quot;</Text>
             )}
           </Animated.View>
         )}

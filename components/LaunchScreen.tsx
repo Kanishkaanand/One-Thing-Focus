@@ -1,7 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   Animated,
   Pressable,
@@ -52,12 +51,12 @@ export default function LaunchScreen({ onComplete }: LaunchScreenProps) {
   const animRef = useRef<Animated.CompositeAnimation | null>(null);
   const completedRef = useRef(false);
 
-  const finish = () => {
+  const finish = useCallback(() => {
     if (completedRef.current) return;
     completedRef.current = true;
     animRef.current?.stop();
     onComplete();
-  };
+  }, [onComplete]);
 
   useEffect(() => {
     pickRandomTagline().then(setTagline);
@@ -101,7 +100,7 @@ export default function LaunchScreen({ onComplete }: LaunchScreenProps) {
     });
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [checkOpacity, finish, nameOpacity, screenOpacity, taglineOpacity, taglineTranslateY]);
 
   return (
     <Pressable onPress={finish} style={StyleSheet.absoluteFill}>

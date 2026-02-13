@@ -46,9 +46,7 @@ export default function OrganicCheck({
     } else {
       dashOffset.setValue(0);
     }
-  }, [animate]);
-
-  const circleStroke = Math.max(scaledStroke * 0.5, 3);
+  }, [animate, animationDelay, animationDuration, dashOffset]);
 
   return (
     <Svg

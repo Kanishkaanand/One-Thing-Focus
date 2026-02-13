@@ -10,7 +10,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/lib/AppContext';
@@ -50,7 +50,7 @@ export default function CalendarScreen() {
     for (let i = 0; i < firstDay; i++) days.push(null);
     for (let d = 1; d <= daysInMonth; d++) days.push(d);
     return days;
-  }, [viewYear, viewMonth, daysInMonth, firstDay]);
+  }, [daysInMonth, firstDay]);
 
   const completedThisMonth = useMemo(() => {
     let count = 0;

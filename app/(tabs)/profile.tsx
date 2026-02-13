@@ -416,7 +416,7 @@ export default function ProfileScreen() {
             </View>
             <Text style={styles.resetTitle}>Reset everything?</Text>
             <Text style={styles.resetDesc}>
-              This will erase all your tasks, streaks, level progress, and settings. You'll start fresh from onboarding.
+              This will erase all your tasks, streaks, level progress, and settings. You&apos;ll start fresh from onboarding.
             </Text>
             <Pressable
               style={styles.resetConfirmBtn}

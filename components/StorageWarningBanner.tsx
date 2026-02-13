@@ -13,7 +13,6 @@ import {
   Pressable,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import Colors from '@/constants/colors';
 import { StorageStatus } from '@/lib/storage';
 
 interface StorageWarningBannerProps {
