@@ -25,6 +25,8 @@ import {
   openNotificationSettings,
   rescheduleAllReminders,
 } from '@/lib/notifications';
+import { useScreenAnalytics } from '@/lib/useAnalytics';
+import { trackReminderToggled } from '@/lib/analytics';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES = [0, 15, 30, 45];
@@ -133,6 +135,9 @@ export default function ProfileScreen() {
   const [notifStatus, setNotifStatus] = useState<{ granted: boolean; canAskAgain: boolean }>({ granted: true, canAskAgain: true });
   const [timePickerTarget, setTimePickerTarget] = useState<'pick' | 'complete' | null>(null);
 
+  // Track screen views
+  useScreenAnalytics('Profile');
+
   useEffect(() => {
     checkNotifStatus();
   }, []);
@@ -171,6 +176,7 @@ export default function ProfileScreen() {
 
     const updated = { ...profile.reminderPickTask, enabled: value };
     await updateProfile({ reminderPickTask: updated });
+    trackReminderToggled('pick', value);
     const newProfile = { ...profile, reminderPickTask: updated };
     await rescheduleAllReminders(newProfile);
   };
@@ -188,6 +194,7 @@ export default function ProfileScreen() {
 
     const updated = { ...profile.reminderCompleteTask, enabled: value };
     await updateProfile({ reminderCompleteTask: updated });
+    trackReminderToggled('complete', value);
     const newProfile = { ...profile, reminderCompleteTask: updated };
     await rescheduleAllReminders(newProfile);
   };

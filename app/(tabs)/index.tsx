@@ -1,16 +1,14 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Pressable,
-  TextInput,
   ScrollView,
   Platform,
-  Modal,
-  Image,
   Dimensions,
-  KeyboardAvoidingView,
+  Image,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -30,13 +28,26 @@ import Animated, {
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import Colors from '@/constants/colors';
 import OrganicCheck from '@/components/OrganicCheck';
 import { useApp } from '@/lib/AppContext';
-import { DailyEntry, saveEntry } from '@/lib/storage';
+import { DailyEntry, saveEntry, TaskItem, isImageSizeValid, getMaxImageSize } from '@/lib/storage';
 import { getGreeting, formatDate, getTodayDate, getStreakMessage } from '@/lib/storage';
+import { createLogger } from '@/lib/errorReporting';
+import { useScreenAnalytics } from '@/lib/useAnalytics';
+import { trackProofUploaded, trackProofSkipped } from '@/lib/analytics';
+import {
+  TaskInputModal,
+  ProofSheet,
+  ReflectionModal,
+  ProofViewModal,
+  type ProofOption,
+  type MoodType,
+} from '@/components/modals';
+import StorageWarningBanner from '@/components/StorageWarningBanner';
 
-type MoodType = 'energized' | 'calm' | 'neutral' | 'tough';
+const logger = createLogger('HomeScreen');
 
 const GENERIC_MESSAGES = [
   "Done and dusted. The rest of the day is yours.",
@@ -65,13 +76,6 @@ const LEVEL_UP_MESSAGES: Record<string, string> = {
   '1_2': "You've unlocked 2 tasks per day. You earned this.",
   '2_3': "Three tasks per day. Look how far you've come.",
 };
-
-const moodOptions: { key: MoodType; icon: string; label: string }[] = [
-  { key: 'energized', icon: 'flame-outline', label: 'Energized' },
-  { key: 'calm', icon: 'leaf-outline', label: 'Calm' },
-  { key: 'neutral', icon: 'remove-circle-outline', label: 'Neutral' },
-  { key: 'tough', icon: 'fitness-outline', label: 'Tough' },
-];
 
 const moodDisplay: Record<string, { icon: string; label: string }> = {
   energized: { icon: 'flame-outline', label: 'Energized' },
@@ -117,12 +121,12 @@ function AnimatedCheckmark({ animate, delay: startDelay }: { animate: boolean; d
   );
 }
 
-function CompletedTaskCard({
+const CompletedTaskCard = memo(function CompletedTaskCard({
   task,
   animate,
   onProofTap,
 }: {
-  task: any;
+  task: TaskItem;
   animate: boolean;
   onProofTap?: (uri: string) => void;
 }) {
@@ -143,7 +147,12 @@ function CompletedTaskCard({
     : null;
 
   return (
-    <View style={styles.completedCardOuter}>
+    <View
+      style={styles.completedCardOuter}
+      accessible={true}
+      accessibilityRole="text"
+      accessibilityLabel={`Completed task: ${task.text}${completedTime ? `. Done at ${completedTime}` : ''}`}
+    >
       <Animated.View style={[styles.completedCardBorder, borderStyle]} />
       <View style={styles.completedCardInner}>
         <View style={styles.completedCardTop}>
@@ -159,6 +168,9 @@ function CompletedTaskCard({
           <Pressable
             onPress={() => onProofTap?.(task.proof.uri)}
             style={styles.proofThumbnailWrap}
+            accessible={true}
+            accessibilityLabel="View proof image"
+            accessibilityRole="button"
           >
             <Image source={{ uri: task.proof.uri }} style={styles.proofThumbnail} />
           </Pressable>
@@ -166,9 +178,15 @@ function CompletedTaskCard({
       </View>
     </View>
   );
-}
+});
 
-function ActiveTaskCard({ task, onComplete }: { task: any; onComplete: (id: string) => void }) {
+const ActiveTaskCard = memo(function ActiveTaskCard({
+  task,
+  onComplete,
+}: {
+  task: TaskItem;
+  onComplete: (id: string) => void;
+}) {
   const scale = useSharedValue(1);
 
   const cardStyle = useAnimatedStyle(() => ({
@@ -191,6 +209,10 @@ function ActiveTaskCard({ task, onComplete }: { task: any; onComplete: (id: stri
       <Pressable
         onPress={handlePress}
         style={[styles.taskCard, task.isCompleted && styles.taskCardDoneInline]}
+        accessible={true}
+        accessibilityLabel={`Task: ${task.text}. ${task.isCompleted ? 'Completed' : 'Tap to mark as complete'}`}
+        accessibilityRole="button"
+        accessibilityState={{ checked: task.isCompleted }}
       >
         <View style={styles.taskLeft}>
           <View style={[styles.checkbox, task.isCompleted && styles.checkboxCompleted]}>
@@ -201,14 +223,18 @@ function ActiveTaskCard({ task, onComplete }: { task: any; onComplete: (id: stri
           </Text>
         </View>
         {task.proof && (
-          <View style={styles.proofBadge}>
+          <View
+            style={styles.proofBadge}
+            accessible={true}
+            accessibilityLabel="Has proof attached"
+          >
             <Feather name="image" size={12} color={Colors.success} />
           </View>
         )}
       </Pressable>
     </Animated.View>
   );
-}
+});
 
 function FloatingParticle({ delay, startX, emoji }: { delay: number; startX: number; emoji: string }) {
   const translateY = useSharedValue(0);
@@ -354,7 +380,11 @@ export default function HomeScreen() {
     justLeveledUp,
     setJustLeveledUp,
     isLoading,
+    storageStatus,
   } = useApp();
+
+  // Track screen views
+  useScreenAnalytics('Home');
 
   const [taskInput, setTaskInput] = useState('');
   const [showInput, setShowInput] = useState(false);
@@ -362,6 +392,7 @@ export default function HomeScreen() {
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
   const [showReflection, setShowReflection] = useState(false);
   const [reflectionNote, setReflectionNote] = useState('');
+  const [showStorageWarning, setShowStorageWarning] = useState(true);
   const [showCelebration, setShowCelebration] = useState(false);
   const [proofViewUri, setProofViewUri] = useState<string | null>(null);
   const [playAnimation, setPlayAnimation] = useState(false);
@@ -426,10 +457,14 @@ export default function HomeScreen() {
 
   const handleAddTask = async () => {
     if (!taskInput.trim()) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await addTask(taskInput.trim());
-    setTaskInput('');
-    setShowInput(false);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await addTask(taskInput.trim());
+      setTaskInput('');
+      setShowInput(false);
+    } catch (e) {
+      logger.error(e instanceof Error ? e : new Error(String(e)), 'addTask');
+    }
   };
 
   const handleCompleteTask = (taskId: string) => {
@@ -437,16 +472,23 @@ export default function HomeScreen() {
     setShowProofSheet(true);
   };
 
-  const handleProofOption = async (type: 'photo' | 'screenshot' | 'skip') => {
+  const handleProofOption = async (type: ProofOption) => {
     if (!completingTaskId) return;
 
     let hadProof = false;
 
     if (type === 'skip') {
-      await completeTask(completingTaskId);
-      setShowProofSheet(false);
-      setCompletingTaskId(null);
-      checkForCompletion(false);
+      try {
+        trackProofSkipped();
+        await completeTask(completingTaskId);
+        setShowProofSheet(false);
+        setCompletingTaskId(null);
+        checkForCompletion(false);
+      } catch (e) {
+        logger.error(e instanceof Error ? e : new Error(String(e)), 'completeTask');
+        setShowProofSheet(false);
+        setCompletingTaskId(null);
+      }
       return;
     }
 
@@ -457,15 +499,44 @@ export default function HomeScreen() {
       });
 
       if (!result.canceled && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+
+        // Validate image size before saving
+        try {
+          const fileInfo = await FileSystem.getInfoAsync(imageUri);
+          if (fileInfo.exists && 'size' in fileInfo && fileInfo.size) {
+            if (!isImageSizeValid(fileInfo.size)) {
+              // Image too large - show error and complete without proof
+              const maxSizeMB = (getMaxImageSize() / (1024 * 1024)).toFixed(1);
+              logger.warn(`Image too large: ${(fileInfo.size / (1024 * 1024)).toFixed(1)}MB (max ${maxSizeMB}MB)`);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+              // Complete task without proof since image is too large
+              trackProofSkipped();
+              await completeTask(completingTaskId);
+              setShowProofSheet(false);
+              setCompletingTaskId(null);
+              checkForCompletion(false);
+              return;
+            }
+          }
+        } catch (sizeError) {
+          // If we can't check size, proceed anyway but log warning
+          logger.warn('Could not verify image size, proceeding anyway');
+        }
+
+        const proofType = type === 'photo' ? 'photo' : 'screenshot';
+        trackProofUploaded(proofType);
         await completeTask(completingTaskId, {
-          type: type === 'photo' ? 'photo' : 'screenshot',
-          uri: result.assets[0].uri,
+          type: proofType,
+          uri: imageUri,
         });
         hadProof = true;
       } else {
+        trackProofSkipped();
         await completeTask(completingTaskId);
       }
-    } catch {
+    } catch (e) {
+      logger.error(e instanceof Error ? e : new Error(String(e)), 'pickImage');
       await completeTask(completingTaskId);
     }
 
@@ -512,10 +583,14 @@ export default function HomeScreen() {
   };
 
   const handleReflection = async (mood: MoodType) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await addReflection(mood, reflectionNote.trim() || undefined);
-    setShowReflection(false);
-    setReflectionNote('');
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await addReflection(mood, reflectionNote.trim() || undefined);
+      setShowReflection(false);
+      setReflectionNote('');
+    } catch (e) {
+      logger.error(e instanceof Error ? e : new Error(String(e)), 'saveReflection');
+    }
   };
 
   if (isLoading || !profile) return <View style={[styles.container, { paddingTop: insets.top }]} />;
@@ -557,6 +632,13 @@ export default function HomeScreen() {
           </View>
           <Text style={styles.levelDaysText}>Day {Math.min(streakDays, 7)} of 7</Text>
         </Animated.View>
+
+        {showStorageWarning && storageStatus && (storageStatus.isWarning || storageStatus.isCritical) && (
+          <StorageWarningBanner
+            storageStatus={storageStatus}
+            onDismiss={() => setShowStorageWarning(false)}
+          />
+        )}
 
         {yesterdayMissed && (
           <Animated.View entering={FadeInDown.delay(300)} style={styles.missedBanner}>
@@ -630,6 +712,9 @@ export default function HomeScreen() {
               <Pressable
                 style={styles.addMoreButton}
                 onPress={() => setShowInput(true)}
+                accessible={true}
+                accessibilityLabel={`Add another task. Current tasks: ${todayEntry?.tasks.length || 0} of ${profile.currentLevel}`}
+                accessibilityRole="button"
               >
                 <Feather name="plus" size={18} color={Colors.textSecondary} />
                 <Text style={styles.addMoreText}>
@@ -658,6 +743,10 @@ export default function HomeScreen() {
             <Pressable
               style={({ pressed }) => [styles.addButton, pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] }]}
               onPress={() => setShowInput(true)}
+              accessible={true}
+              accessibilityLabel="Add your task"
+              accessibilityRole="button"
+              accessibilityHint="Opens a dialog to enter your task for today"
             >
               <Feather name="plus" size={20} color="#FFF" />
               <Text style={styles.addButtonText}>Add your task</Text>
@@ -667,125 +756,31 @@ export default function HomeScreen() {
 
       </ScrollView>
 
-      <Modal visible={showInput} transparent animationType="fade">
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.inputModalWrap}
-        >
-          <Pressable style={styles.inputModalBackdrop} onPress={() => { setShowInput(false); setTaskInput(''); }} />
-          <Animated.View entering={FadeInDown.duration(250)} style={[styles.inputSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-            <View style={styles.inputSheetHandle} />
-            <Text style={styles.inputSheetTitle}>What will you focus on?</Text>
-            <View style={styles.inputRow}>
-              <TextInput
-                testID="task-input"
-                style={styles.taskInput}
-                placeholder="Type your task here..."
-                placeholderTextColor={Colors.neutral}
-                value={taskInput}
-                onChangeText={setTaskInput}
-                autoFocus
-                returnKeyType="done"
-                onSubmitEditing={handleAddTask}
-                multiline={false}
-              />
-              <Pressable
-                onPress={handleAddTask}
-                style={[styles.submitBtn, !taskInput.trim() && { opacity: 0.4 }]}
-                disabled={!taskInput.trim()}
-              >
-                <Feather name="arrow-up" size={20} color="#FFF" />
-              </Pressable>
-            </View>
-          </Animated.View>
-        </KeyboardAvoidingView>
-      </Modal>
+      <TaskInputModal
+        visible={showInput}
+        value={taskInput}
+        onChangeText={setTaskInput}
+        onSubmit={handleAddTask}
+        onClose={() => setShowInput(false)}
+      />
 
-      <Modal visible={showProofSheet} transparent animationType="slide">
-        <Pressable style={styles.sheetOverlay} onPress={() => setShowProofSheet(false)}>
-          <Pressable style={styles.sheetContent} onPress={e => e.stopPropagation()}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Add proof</Text>
-            <Text style={styles.sheetSubtitle}>Optional — capture your progress</Text>
-            <View style={styles.sheetOptions}>
-              <Pressable
-                style={({ pressed }) => [styles.proofOption, pressed && { opacity: 0.7 }]}
-                onPress={() => handleProofOption('photo')}
-              >
-                <View style={styles.proofIconWrap}>
-                  <Feather name="camera" size={22} color={Colors.accent} />
-                </View>
-                <Text style={styles.proofOptionText}>Upload Photo</Text>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [styles.proofOption, pressed && { opacity: 0.7 }]}
-                onPress={() => handleProofOption('screenshot')}
-              >
-                <View style={styles.proofIconWrap}>
-                  <Feather name="image" size={22} color={Colors.accent} />
-                </View>
-                <Text style={styles.proofOptionText}>Upload Screenshot</Text>
-              </Pressable>
-            </View>
-            <Pressable
-              style={({ pressed }) => [styles.skipProofButton, pressed && { opacity: 0.7 }]}
-              onPress={() => handleProofOption('skip')}
-            >
-              <Text style={styles.skipProofText}>Skip — just mark as done</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <ProofSheet
+        visible={showProofSheet}
+        onSelect={handleProofOption}
+        onClose={() => setShowProofSheet(false)}
+      />
 
-      <Modal visible={showReflection} transparent animationType="fade">
-        <View style={styles.reflectionOverlay}>
-          <Animated.View entering={FadeInDown.springify()} style={styles.reflectionSheet}>
-            <Text style={styles.reflectionTitle}>How did today feel?</Text>
-            <View style={styles.moodGrid}>
-              {moodOptions.map((mood) => (
-                <Pressable
-                  key={mood.key}
-                  style={({ pressed }) => [styles.moodOption, pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] }]}
-                  onPress={() => handleReflection(mood.key)}
-                >
-                  <View style={styles.moodIconWrap}>
-                    <Ionicons name={mood.icon as any} size={28} color={Colors.accent} />
-                  </View>
-                  <Text style={styles.moodLabel}>{mood.label}</Text>
-                </Pressable>
-              ))}
-            </View>
-            <TextInput
-              style={styles.reflectionInput}
-              placeholder="Anything to remember?"
-              placeholderTextColor={Colors.neutral}
-              value={reflectionNote}
-              onChangeText={setReflectionNote}
-            />
-          </Animated.View>
-        </View>
-      </Modal>
+      <ReflectionModal
+        visible={showReflection}
+        note={reflectionNote}
+        onNoteChange={setReflectionNote}
+        onSelectMood={handleReflection}
+      />
 
-      <Modal visible={!!proofViewUri} transparent animationType="fade">
-        <Pressable
-          style={styles.proofViewOverlay}
-          onPress={() => setProofViewUri(null)}
-        >
-          {proofViewUri && (
-            <Image
-              source={{ uri: proofViewUri }}
-              style={styles.proofViewImage}
-              resizeMode="contain"
-            />
-          )}
-          <Pressable
-            style={styles.proofViewClose}
-            onPress={() => setProofViewUri(null)}
-          >
-            <Feather name="x" size={24} color="#FFF" />
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <ProofViewModal
+        uri={proofViewUri}
+        onClose={() => setProofViewUri(null)}
+      />
 
       {proofToast && (
         <Animated.View

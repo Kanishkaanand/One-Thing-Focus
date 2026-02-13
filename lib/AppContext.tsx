@@ -11,14 +11,31 @@ import {
   generateId,
   processEndOfDay,
   clearAllData,
+  checkStorageQuota,
+  StorageStatus,
 } from './storage';
+import { createLogger } from './errorReporting';
+
+const logger = createLogger('AppContext');
 import { syncNotifications, rescheduleAllReminders } from './notifications';
+import { validateTaskInput, validateNoteInput, validateMood, type MoodType } from './validation';
+import {
+  initAnalytics,
+  trackAppOpened,
+  trackTaskCreated,
+  trackTaskCompleted,
+  trackDayCompleted,
+  trackLevelUp,
+  trackReflectionAdded,
+  trackDataReset,
+} from './analytics';
 
 interface AppContextValue {
   profile: UserProfile | null;
   todayEntry: DailyEntry | null;
   entries: Record<string, DailyEntry>;
   isLoading: boolean;
+  storageStatus: StorageStatus | null;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   addTask: (text: string) => Promise<void>;
   completeTask: (taskId: string, proof?: TaskItem['proof']) => Promise<void>;
@@ -43,11 +60,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [yesterdayMissed, setYesterdayMissed] = useState(false);
   const [justLeveledUp, setJustLeveledUp] = useState(false);
   const [onResetCallback, setOnResetCallback] = useState<(() => void) | null>(null);
+  const [storageStatus, setStorageStatus] = useState<StorageStatus | null>(null);
 
   const loadData = useCallback(async () => {
     try {
+      // Initialize analytics on app load
+      await initAnalytics();
+
       let prof = await getProfile();
       const allEntries = await getAllEntries();
+
+      // Track app opened with days since last open
+      const lastEntry = Object.keys(allEntries).sort().pop();
+      const daysSinceLastOpen = lastEntry
+        ? Math.floor((Date.now() - new Date(lastEntry).getTime()) / (1000 * 60 * 60 * 24))
+        : undefined;
+      trackAppOpened(daysSinceLastOpen);
 
       const processed = await processEndOfDay(prof, allEntries);
       if (processed.currentLevel !== prof.currentLevel || processed.currentLevelStreak !== prof.currentLevelStreak) {
@@ -69,8 +97,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setTodayEntry(currentTodayEntry);
 
       await syncNotifications(prof, currentTodayEntry);
+
+      // Check storage quota
+      const quota = await checkStorageQuota();
+      setStorageStatus(quota);
+      if (quota.isCritical) {
+        logger.error(new Error(`Storage critically full: ${quota.percentUsed}%`), 'checkStorageQuota');
+      } else if (quota.isWarning) {
+        logger.warn(`Storage warning: ${quota.percentUsed}% used`);
+      }
     } catch (e) {
-      console.error('Failed to load data:', e);
+      logger.error(e instanceof Error ? e : new Error(String(e)), 'loadData');
     } finally {
       setIsLoading(false);
     }
@@ -89,6 +126,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addTask = useCallback(async (text: string) => {
     if (!profile) return;
+
+    // Validate and sanitize input
+    const validation = validateTaskInput(text);
+    if (!validation.valid) {
+      throw new Error(validation.error);
+    }
+    const sanitizedText = validation.sanitized!;
+
     const today = getTodayDate();
     const current = todayEntry || {
       date: today,
@@ -99,7 +144,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const newTask: TaskItem = {
       id: generateId(),
-      text,
+      text: sanitizedText,
       createdAt: new Date().toISOString(),
       isCompleted: false,
     };
@@ -112,6 +157,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await saveEntry(updated);
     setTodayEntry(updated);
     setEntries(prev => ({ ...prev, [today]: updated }));
+
+    // Track task creation
+    trackTaskCreated(profile.currentLevel, updated.tasks.length);
 
     await syncNotifications(profile, updated);
   }, [profile, todayEntry]);
@@ -126,6 +174,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const allDone = updatedTasks.every(t => t.isCompleted);
     const completedCount = updatedTasks.filter(t => t.isCompleted).length;
 
+    // Track task completion
+    trackTaskCompleted(!!proof, proof?.type);
+
     let newProfile = { ...profile };
     newProfile.totalTasksCompleted = profile.totalTasksCompleted + 1;
 
@@ -135,8 +186,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
         newProfile.longestStreak = newProfile.currentLevelStreak;
       }
 
+      // Track day completed
+      trackDayCompleted(
+        newProfile.currentLevelStreak,
+        updatedTasks.length,
+        profile.currentLevel
+      );
+
       if (newProfile.currentLevelStreak >= 7 && newProfile.currentLevel < 3) {
-        const newLevel = (newProfile.currentLevel + 1) as 1 | 2 | 3;
+        const newLevel = Math.min(newProfile.currentLevel + 1, 3) as 1 | 2 | 3;
+
+        // Track level up
+        trackLevelUp(profile.currentLevel, newLevel, newProfile.currentLevelStreak);
+
         newProfile.currentLevel = newLevel;
         newProfile.currentLevelStreak = 0;
         setJustLeveledUp(true);
@@ -160,22 +222,48 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addReflection = useCallback(async (mood: 'energized' | 'calm' | 'neutral' | 'tough', note?: string) => {
     if (!todayEntry) return;
+
+    // Runtime validate mood value (defense in depth)
+    const validatedMood = validateMood(mood);
+    if (!validatedMood) {
+      logger.error(new Error(`Invalid mood value: ${mood}`), 'addReflection');
+      throw new Error('Invalid mood value');
+    }
+
+    // Validate and sanitize note if provided
+    let sanitizedNote: string | undefined;
+    if (note) {
+      const validation = validateNoteInput(note);
+      if (!validation.valid) {
+        throw new Error(validation.error);
+      }
+      sanitizedNote = validation.sanitized;
+    }
+
     const updated: DailyEntry = {
       ...todayEntry,
-      reflection: { mood, note },
+      reflection: { mood: validatedMood, note: sanitizedNote },
     };
     await saveEntry(updated);
     setTodayEntry(updated);
     setEntries(prev => ({ ...prev, [todayEntry.date]: updated }));
+
+    // Track reflection added
+    trackReflectionAdded(validatedMood, !!sanitizedNote);
   }, [todayEntry]);
 
   const resetAllData = useCallback(async () => {
+    // Track data reset before clearing
+    if (profile) {
+      trackDataReset(profile.currentLevelStreak, profile.totalTasksCompleted);
+    }
+
     await clearAllData();
     setJustLeveledUp(false);
     setYesterdayMissed(false);
     onResetCallback?.();
     await loadData();
-  }, [loadData, onResetCallback]);
+  }, [loadData, onResetCallback, profile]);
 
   const canAddMoreTasks = useMemo(() => {
     if (!profile || !todayEntry) return true;
@@ -188,6 +276,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     todayEntry,
     entries,
     isLoading,
+    storageStatus,
     updateProfile,
     addTask,
     completeTask,
@@ -200,7 +289,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setJustLeveledUp,
     onResetCallback,
     setOnResetCallback,
-  }), [profile, todayEntry, entries, isLoading, updateProfile, addTask, completeTask, addReflection, canAddMoreTasks, loadData, resetAllData, yesterdayMissed, justLeveledUp, onResetCallback]);
+  }), [profile, todayEntry, entries, isLoading, storageStatus, updateProfile, addTask, completeTask, addReflection, canAddMoreTasks, loadData, resetAllData, yesterdayMissed, justLeveledUp, onResetCallback]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
