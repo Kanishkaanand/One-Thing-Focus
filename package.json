@@ -22,7 +22,12 @@
     "eas:submit:ios": "eas submit -p ios --profile production",
     "eas:submit:android": "eas submit -p android --profile production",
     "release:ios": "npm run eas:build:ios && npm run eas:submit:ios",
-    "release:android": "npm run eas:build:android && npm run eas:submit:android"
+    "release:android": "npm run eas:build:android && npm run eas:submit:android",
+    "fastlane:setup": "bundle install",
+    "fastlane:verify": "bundle exec fastlane verify",
+    "fastlane:ios": "bundle exec fastlane ios release",
+    "fastlane:android": "bundle exec fastlane android release",
+    "fastlane:all": "bundle exec fastlane release_all"
   },
   "dependencies": {
     "@expo-google-fonts/dm-sans": "^0.4.2",

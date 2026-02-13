@@ -1,0 +1,4 @@
+app_identifier(ENV.fetch("FASTLANE_IOS_BUNDLE_ID", "com.kanishkaanand.onethingfocus"))
+package_name(ENV.fetch("FASTLANE_ANDROID_PACKAGE_NAME", "com.kanishkaanand.onethingfocus"))
+
+apple_id(ENV["FASTLANE_APPLE_ID"]) if ENV["FASTLANE_APPLE_ID"]

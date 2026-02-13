@@ -1,0 +1,68 @@
+fastlane_version "2.227.2"
+
+default_platform :ios
+
+private_lane :run_verify do
+  sh("npm run lint")
+  sh("npm test -- --runInBand")
+end
+
+private_lane :ensure_eas_cli do
+  sh("npx eas --version")
+end
+
+desc "Run release quality checks (lint + tests)"
+lane :verify do
+  run_verify
+end
+
+platform :ios do
+  desc "Build and submit iOS production release through EAS"
+  lane :release do |options|
+    run_verify unless options[:skip_verify]
+    ensure_eas_cli
+    sh("npm run eas:build:ios")
+    sh("npm run eas:submit:ios")
+  end
+
+  desc "Upload iOS store metadata only (no binary)"
+  lane :metadata do
+    deliver(
+      force: true,
+      skip_binary_upload: true,
+      skip_screenshots: false,
+      skip_metadata: false
+    )
+  end
+end
+
+platform :android do
+  desc "Build and submit Android production release through EAS"
+  lane :release do |options|
+    run_verify unless options[:skip_verify]
+    ensure_eas_cli
+    sh("npm run eas:build:android")
+    sh("npm run eas:submit:android")
+  end
+
+  desc "Upload Android Play metadata only (no binary)"
+  lane :metadata do
+    supply(
+      skip_upload_apk: true,
+      skip_upload_aab: true,
+      skip_upload_metadata: false,
+      skip_upload_images: false,
+      skip_upload_screenshots: false
+    )
+  end
+end
+
+desc "Build and submit both iOS and Android through EAS"
+lane :release_all do |options|
+  run_verify unless options[:skip_verify]
+  ensure_eas_cli
+  sh("npm run eas:build:ios")
+  sh("npm run eas:submit:ios")
+  sh("npm run eas:build:android")
+  sh("npm run eas:submit:android")
+end

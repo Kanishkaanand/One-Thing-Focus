@@ -33,9 +33,15 @@ yarn-error.*
 
 # local env files
 .env*.local
+.env.fastlane
 
 # typescript
 *.tsbuildinfo
 .vercel
 
 .env
+
+# fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/test_output
