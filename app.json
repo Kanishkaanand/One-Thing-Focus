@@ -15,10 +15,20 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.onething"
+      "bundleIdentifier": "com.onething.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSUserNotificationUsageDescription": "One Thing uses notifications to remind you to pick and complete your daily task.",
+        "NSPhotoLibraryUsageDescription": "One Thing lets you attach a photo as proof of task completion."
+      }
     },
     "android": {
-      "package": "com.onething",
+      "package": "com.onething.app",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.READ_MEDIA_IMAGES"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#FAF7F2",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -34,6 +44,18 @@
         "expo-router",
         {
           "origin": "https://replit.com/"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "One Thing lets you attach a photo as proof of task completion."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "daily-reminders"
         }
       ],
       "expo-font",

@@ -10,6 +10,7 @@ import {
   Switch,
   Modal,
   Alert,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,6 +31,8 @@ import { trackReminderToggled } from '@/lib/analytics';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES = [0, 15, 30, 45];
+const PRIVACY_POLICY_URL = process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL || 'https://example.com/privacy';
+const TERMS_URL = process.env.EXPO_PUBLIC_TERMS_URL || 'https://example.com/terms';
 
 function StatCard({ icon, label, value, delay }: { icon: string; label: string; value: string | number; delay: number }) {
   return (
@@ -213,6 +216,19 @@ export default function ProfileScreen() {
     }
   };
 
+  const openExternalUrl = async (url: string, label: string) => {
+    try {
+      const canOpen = await Linking.canOpenURL(url);
+      if (!canOpen) {
+        Alert.alert('Link unavailable', `Could not open ${label}.`);
+        return;
+      }
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Link unavailable', `Could not open ${label}.`);
+    }
+  };
+
   const webTopInset = Platform.OS === 'web' ? 67 : 0;
   const showNotifWarning = Platform.OS !== 'web' && !notifStatus.granted && !notifStatus.canAskAgain;
 
@@ -361,7 +377,31 @@ export default function ProfileScreen() {
           </Pressable>
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(600)} style={styles.aboutSection}>
+        <Animated.View entering={FadeInDown.delay(560)} style={styles.settingsSection}>
+          <Text style={styles.sectionTitle}>Legal</Text>
+          <Pressable
+            style={styles.legalRow}
+            onPress={() => openExternalUrl(PRIVACY_POLICY_URL, 'Privacy Policy')}
+          >
+            <View style={styles.settingLeft}>
+              <Feather name="shield" size={18} color={Colors.textSecondary} />
+              <Text style={styles.settingText}>Privacy Policy</Text>
+            </View>
+            <Feather name="external-link" size={16} color={Colors.neutral} />
+          </Pressable>
+          <Pressable
+            style={styles.legalRow}
+            onPress={() => openExternalUrl(TERMS_URL, 'Terms of Use')}
+          >
+            <View style={styles.settingLeft}>
+              <Feather name="file-text" size={18} color={Colors.textSecondary} />
+              <Text style={styles.settingText}>Terms of Use</Text>
+            </View>
+            <Feather name="external-link" size={16} color={Colors.neutral} />
+          </Pressable>
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.delay(620)} style={styles.aboutSection}>
           <Text style={styles.sectionTitle}>About</Text>
           <Text style={styles.aboutText}>One Thing v1.0.0</Text>
           <Text style={styles.aboutCredit}>Made with care</Text>
@@ -703,6 +743,15 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderRadius: 14,
     padding: 16,
+  },
+  legalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 8,
   },
   resetText: {
     fontFamily: 'DMSans_500Medium',
