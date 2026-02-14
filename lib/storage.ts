@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { v4 as uuidv4 } from 'uuid';
+import * as Crypto from 'expo-crypto';
 import { parseUserProfile, parseEntries } from './validation';
 import { createLogger } from './errorReporting';
 
@@ -213,7 +213,7 @@ export function getStreakMessage(streak: number): string {
  * Generate a cryptographically secure unique ID using UUID v4
  */
 export function generateId(): string {
-  return uuidv4();
+  return Crypto.randomUUID();
 }
 
 export async function clearAllData(): Promise<void> {

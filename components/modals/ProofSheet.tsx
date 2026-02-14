@@ -9,7 +9,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import Colors from '@/constants/colors';
 
-export type ProofOption = 'photo' | 'screenshot' | 'skip';
+export type ProofOption = 'upload' | 'camera' | 'skip';
 
 interface ProofSheetProps {
   visible: boolean;
@@ -39,28 +39,28 @@ function ProofSheet({ visible, onSelect, onClose }: ProofSheetProps) {
           <View style={styles.options}>
             <Pressable
               style={({ pressed }) => [styles.option, pressed && styles.optionPressed]}
-              onPress={() => onSelect('photo')}
+              onPress={() => onSelect('upload')}
               accessible={true}
-              accessibilityLabel="Upload photo as proof"
+              accessibilityLabel="Upload from device"
+              accessibilityRole="button"
+            >
+              <View style={styles.iconWrap}>
+                <Feather name="upload" size={22} color={Colors.accent} />
+              </View>
+              <Text style={styles.optionText}>Upload from Device</Text>
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [styles.option, pressed && styles.optionPressed]}
+              onPress={() => onSelect('camera')}
+              accessible={true}
+              accessibilityLabel="Take a picture"
               accessibilityRole="button"
             >
               <View style={styles.iconWrap}>
                 <Feather name="camera" size={22} color={Colors.accent} />
               </View>
-              <Text style={styles.optionText}>Upload Photo</Text>
-            </Pressable>
-
-            <Pressable
-              style={({ pressed }) => [styles.option, pressed && styles.optionPressed]}
-              onPress={() => onSelect('screenshot')}
-              accessible={true}
-              accessibilityLabel="Upload screenshot as proof"
-              accessibilityRole="button"
-            >
-              <View style={styles.iconWrap}>
-                <Feather name="image" size={22} color={Colors.accent} />
-              </View>
-              <Text style={styles.optionText}>Upload Screenshot</Text>
+              <Text style={styles.optionText}>Take a Picture</Text>
             </Pressable>
           </View>
 

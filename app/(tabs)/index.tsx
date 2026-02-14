@@ -21,6 +21,7 @@ import Animated, {
   withSequence,
   withTiming,
   withDelay,
+  withRepeat,
   Easing,
 } from 'react-native-reanimated';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -212,36 +213,92 @@ const ActiveTaskCard = memo(function ActiveTaskCard({
   };
 
   return (
-    <Animated.View entering={FadeInDown.duration(400).springify()} style={cardStyle}>
-      <Pressable
-        onPress={handlePress}
-        style={[styles.taskCard, task.isCompleted && styles.taskCardDoneInline]}
-        accessible={true}
-        accessibilityLabel={`Task: ${task.text}. ${task.isCompleted ? 'Completed' : 'Tap to mark as complete'}`}
-        accessibilityRole="button"
-        accessibilityState={{ checked: task.isCompleted }}
-      >
-        <View style={styles.taskLeft}>
-          <View style={[styles.checkbox, task.isCompleted && styles.checkboxCompleted]}>
-            {task.isCompleted && <Feather name="check" size={14} color="#FFF" />}
+    <Animated.View entering={FadeInDown.duration(400).springify()}>
+      <Animated.View style={cardStyle}>
+        <Pressable
+          onPress={handlePress}
+          style={[styles.taskCard, task.isCompleted && styles.taskCardDoneInline]}
+          accessible={true}
+          accessibilityLabel={`Task: ${task.text}. ${task.isCompleted ? 'Completed' : 'Tap to mark as complete'}`}
+          accessibilityRole="button"
+          accessibilityState={{ checked: task.isCompleted }}
+        >
+          <View style={styles.taskLeft}>
+            <View style={[styles.checkbox, task.isCompleted && styles.checkboxCompleted]}>
+              {task.isCompleted && <Feather name="check" size={14} color="#FFF" />}
+            </View>
+            <Text style={[styles.taskText, task.isCompleted && styles.taskTextCompleted]}>
+              {task.text}
+            </Text>
           </View>
-          <Text style={[styles.taskText, task.isCompleted && styles.taskTextCompleted]}>
-            {task.text}
-          </Text>
-        </View>
-        {task.proof && (
-          <View
-            style={styles.proofBadge}
-            accessible={true}
-            accessibilityLabel="Has proof attached"
-          >
-            <Feather name="image" size={12} color={Colors.success} />
-          </View>
-        )}
-      </Pressable>
+          {task.proof && (
+            <View
+              style={styles.proofBadge}
+              accessible={true}
+              accessibilityLabel="Has proof attached"
+            >
+              <Feather name="image" size={12} color={Colors.success} />
+            </View>
+          )}
+        </Pressable>
+      </Animated.View>
     </Animated.View>
   );
 });
+
+// Mindful encouragement component with gentle breathing animation
+const MINDFUL_MESSAGES = [
+  "Take your time. There's no rush.",
+  "One small step at a time.",
+  "You've got this, whenever you're ready.",
+  "Breathe. You're doing great.",
+  "Progress, not perfection.",
+  "Trust the process.",
+];
+
+function MindfulEncouragement() {
+  const breatheScale = useSharedValue(1);
+  const breatheOpacity = useSharedValue(0.4);
+  const [message] = useState(() =>
+    MINDFUL_MESSAGES[Math.floor(Math.random() * MINDFUL_MESSAGES.length)]
+  );
+
+  useEffect(() => {
+    // Gentle breathing animation - 4 seconds inhale, 4 seconds exhale
+    breatheScale.value = withRepeat(
+      withSequence(
+        withTiming(1.15, { duration: 4000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1, { duration: 4000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1, // infinite repeat
+      false
+    );
+    breatheOpacity.value = withRepeat(
+      withSequence(
+        withTiming(0.6, { duration: 4000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.3, { duration: 4000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      false
+    );
+  }, [breatheScale, breatheOpacity]);
+
+  const breatheStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: breatheScale.value }],
+    opacity: breatheOpacity.value,
+  }));
+
+  return (
+    <Animated.View entering={FadeIn.delay(600).duration(800)} style={styles.mindfulContainer}>
+      <View style={styles.mindfulContent}>
+        <Animated.View style={[styles.breatheCircle, breatheStyle]}>
+          <View style={styles.breatheInner} />
+        </Animated.View>
+        <Text style={styles.mindfulText}>{message}</Text>
+      </View>
+    </Animated.View>
+  );
+}
 
 function FloatingParticle({ delay, startX, emoji }: { delay: number; startX: number; emoji: string }) {
   const translateY = useSharedValue(0);
@@ -507,10 +564,27 @@ export default function HomeScreen() {
     }
 
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 0.7,
-      });
+      let result;
+
+      if (type === 'camera') {
+        // Request camera permissions first
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          logger.warn('Camera permission denied');
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ['images'],
+          quality: 0.7,
+        });
+      } else {
+        // Upload from device library
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          quality: 0.7,
+        });
+      }
 
       if (!result.canceled && result.assets[0]) {
         const imageUri = result.assets[0].uri;
@@ -538,25 +612,21 @@ export default function HomeScreen() {
           logger.warn('Could not verify image size, proceeding anyway');
         }
 
-        const proofType = type === 'photo' ? 'photo' : 'screenshot';
-        trackProofUploaded(proofType);
+        trackProofUploaded('photo');
         await completeTask(completingTaskId, {
-          type: proofType,
+          type: 'photo',
           uri: imageUri,
         });
         hadProof = true;
-      } else {
-        trackProofSkipped();
-        await completeTask(completingTaskId);
+        setShowProofSheet(false);
+        setCompletingTaskId(null);
+        checkForCompletion(hadProof);
       }
+      // If cancelled, do nothing - keep proof sheet open so user can try again or skip
     } catch (e) {
       logger.error(e instanceof Error ? e : new Error(String(e)), 'pickImage');
-      await completeTask(completingTaskId);
+      // On error, don't complete the task - let user try again or skip
     }
-
-    setShowProofSheet(false);
-    setCompletingTaskId(null);
-    checkForCompletion(hadProof);
   };
 
   const checkForCompletion = (showToast: boolean) => {
@@ -721,6 +791,8 @@ export default function HomeScreen() {
                 onComplete={handleCompleteTask}
               />
             ))}
+
+            {!allDone && <MindfulEncouragement />}
 
             {canAddMoreTasks && !allDone && (
               <Pressable
@@ -910,6 +982,39 @@ const styles = StyleSheet.create({
   tasksSection: {
     gap: 12,
     marginTop: 8,
+  },
+  mindfulContainer: {
+    alignItems: 'center',
+    marginTop: 40,
+    marginBottom: 20,
+  },
+  mindfulContent: {
+    alignItems: 'center',
+    gap: 20,
+  },
+  breatheCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.accentLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  breatheInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.accent,
+    opacity: 0.3,
+  },
+  mindfulText: {
+    fontFamily: 'DMSans_400Regular',
+    fontSize: 15,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    fontStyle: 'italic',
+    paddingHorizontal: 40,
+    lineHeight: 22,
   },
   taskCard: {
     backgroundColor: Colors.surface,

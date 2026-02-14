@@ -27,7 +27,9 @@
     "fastlane:verify": "bundle exec fastlane verify",
     "fastlane:ios": "bundle exec fastlane ios release",
     "fastlane:android": "bundle exec fastlane android release",
-    "fastlane:all": "bundle exec fastlane release_all"
+    "fastlane:all": "bundle exec fastlane release_all",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   },
   "dependencies": {
     "@expo-google-fonts/dm-sans": "^0.4.2",

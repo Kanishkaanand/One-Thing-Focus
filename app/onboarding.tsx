@@ -26,7 +26,6 @@ import { formatTime12h } from '@/lib/storage';
 import { requestNotificationPermissions } from '@/lib/notifications';
 import { useScreenAnalytics } from '@/lib/useAnalytics';
 import { trackOnboardingCompleted } from '@/lib/analytics';
-
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const slides = [
