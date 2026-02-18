@@ -174,11 +174,7 @@ export async function saveEntry(entry: DailyEntry): Promise<void> {
 }
 
 export function getTodayDate(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return getLocalDateStr(new Date());
 }
 
 export function getGreeting(): string {
@@ -188,8 +184,16 @@ export function getGreeting(): string {
   return 'Good evening';
 }
 
+export function getLocalDateStr(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 export function formatDate(dateStr: string): string {
-  const date = new Date(dateStr + 'T12:00:00');
+  const parts = dateStr.split('-');
+  const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]}`;
@@ -283,7 +287,7 @@ export function isImageSizeValid(sizeInBytes: number): boolean {
 export async function processEndOfDay(profile: UserProfile, entries: Record<string, DailyEntry>): Promise<UserProfile> {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+  const yesterdayStr = getLocalDateStr(yesterday);
 
   const yesterdayEntry = entries[yesterdayStr];
 

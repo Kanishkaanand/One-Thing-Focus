@@ -8,6 +8,7 @@ import {
   getAllEntries,
   saveEntry,
   getTodayDate,
+  getLocalDateStr,
   generateId,
   processEndOfDay,
   clearAllData,
@@ -85,7 +86,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
-      const yStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+      const yStr = getLocalDateStr(yesterday);
       const yEntry = allEntries[yStr];
       setYesterdayMissed(!!yEntry && !yEntry.completed && yEntry.tasks.length > 0);
 
