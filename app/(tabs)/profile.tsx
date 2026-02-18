@@ -403,7 +403,7 @@ export default function ProfileScreen() {
         <Animated.View entering={FadeInDown.delay(560)} style={styles.aboutSection}>
           <Text style={styles.sectionTitle}>About</Text>
           <Text style={styles.aboutText}>One Thing v1.0.0</Text>
-          <Text style={styles.aboutCredit}>Made with care</Text>
+          <Text style={styles.aboutCredit}>Made with love in Bangalore ❤️</Text>
         </Animated.View>
       </ScrollView>
 
