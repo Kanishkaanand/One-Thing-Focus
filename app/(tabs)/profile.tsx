@@ -28,6 +28,7 @@ import {
 } from '@/lib/notifications';
 import { useScreenAnalytics } from '@/lib/useAnalytics';
 import { trackReminderToggled } from '@/lib/analytics';
+import { useShakeDetector } from '@/lib/useShakeDetector';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES = [0, 15, 30, 45];
@@ -144,6 +145,14 @@ export default function ProfileScreen() {
 
   // Track screen views
   useScreenAnalytics('Profile');
+
+  // Shake gesture triggers hidden reset flow
+  useShakeDetector({
+    onShake: () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      setShowResetConfirm(true);
+    },
+  });
 
   useEffect(() => {
     checkNotifStatus();
@@ -368,20 +377,6 @@ export default function ProfileScreen() {
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(500)} style={styles.settingsSection}>
-          <Text style={styles.sectionTitle}>Settings</Text>
-          <Pressable
-            style={styles.resetRow}
-            onPress={() => setShowResetConfirm(true)}
-          >
-            <View style={styles.settingLeft}>
-              <Feather name="refresh-cw" size={18} color="#D45B5B" />
-              <Text style={styles.resetText}>Reset App Data</Text>
-            </View>
-            <Feather name="chevron-right" size={18} color={Colors.neutral} />
-          </Pressable>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.delay(560)} style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>Legal</Text>
           <Pressable
             style={styles.legalRow}
@@ -405,7 +400,7 @@ export default function ProfileScreen() {
           </Pressable>
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(620)} style={styles.aboutSection}>
+        <Animated.View entering={FadeInDown.delay(560)} style={styles.aboutSection}>
           <Text style={styles.sectionTitle}>About</Text>
           <Text style={styles.aboutText}>One Thing v1.0.0</Text>
           <Text style={styles.aboutCredit}>Made with care</Text>
@@ -740,14 +735,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#FFF',
   },
-  resetRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 16,
-  },
   legalRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -756,11 +743,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 16,
     marginBottom: 8,
-  },
-  resetText: {
-    fontFamily: 'DMSans_500Medium',
-    fontSize: 15,
-    color: '#D45B5B',
   },
   resetOverlay: {
     flex: 1,
