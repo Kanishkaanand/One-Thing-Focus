@@ -10,6 +10,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: false,
     shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -181,8 +183,13 @@ export async function syncNotifications(
   await cancelAllReminders();
 }
 
-export async function rescheduleAllReminders(profile: UserProfile): Promise<void> {
+export async function rescheduleAllReminders(profile: UserProfile, todayEntry?: DailyEntry | null): Promise<void> {
   if (Platform.OS === 'web') return;
+
+  if (todayEntry !== undefined) {
+    await syncNotifications(profile, todayEntry);
+    return;
+  }
 
   const { granted } = await getNotificationPermissionStatus();
   if (!granted) return;

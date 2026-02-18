@@ -251,7 +251,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     // Track reflection added
     trackReflectionAdded(validatedMood, !!sanitizedNote);
-  }, [todayEntry]);
+
+    if (profile) {
+      await syncNotifications(profile, updated);
+    }
+  }, [todayEntry, profile]);
 
   const resetAllData = useCallback(async () => {
     // Track data reset before clearing

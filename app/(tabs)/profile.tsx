@@ -135,7 +135,7 @@ function TimePicker({
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { profile, entries, updateProfile, resetAllData, isLoading } = useApp();
+  const { profile, todayEntry, entries, updateProfile, resetAllData, isLoading } = useApp();
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -185,7 +185,7 @@ export default function ProfileScreen() {
     await updateProfile({ reminderPickTask: updated });
     trackReminderToggled('pick', value);
     const newProfile = { ...profile, reminderPickTask: updated };
-    await rescheduleAllReminders(newProfile);
+    await rescheduleAllReminders(newProfile, todayEntry);
   };
 
   const handleToggleCompleteReminder = async (value: boolean) => {
@@ -203,7 +203,7 @@ export default function ProfileScreen() {
     await updateProfile({ reminderCompleteTask: updated });
     trackReminderToggled('complete', value);
     const newProfile = { ...profile, reminderCompleteTask: updated };
-    await rescheduleAllReminders(newProfile);
+    await rescheduleAllReminders(newProfile, todayEntry);
   };
 
   const handleTimeSelect = async (time: string) => {
@@ -211,12 +211,12 @@ export default function ProfileScreen() {
       const updated = { ...profile.reminderPickTask, time };
       await updateProfile({ reminderPickTask: updated });
       const newProfile = { ...profile, reminderPickTask: updated };
-      await rescheduleAllReminders(newProfile);
+      await rescheduleAllReminders(newProfile, todayEntry);
     } else if (timePickerTarget === 'complete') {
       const updated = { ...profile.reminderCompleteTask, time };
       await updateProfile({ reminderCompleteTask: updated });
       const newProfile = { ...profile, reminderCompleteTask: updated };
-      await rescheduleAllReminders(newProfile);
+      await rescheduleAllReminders(newProfile, todayEntry);
     }
   };
 
