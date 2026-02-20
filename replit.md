@@ -32,6 +32,20 @@ lib/
   query-client.ts     - React Query setup (unused for local-only)
 constants/
   colors.ts           - Warm minimalist color palette
+widgets/
+  ios/
+    Module.swift        - Widget bundle entry point
+    OneThingWidget.swift - iOS widget (small + medium sizes)
+    Assets.xcassets/    - Widget assets
+  android/
+    main/java/com/onething/
+      OneThingWidgetProvider.kt - Android widget provider
+    main/res/layout/
+      widget_layout.xml   - Android widget layout
+    main/res/xml/
+      one_thing_widget_info.xml - Widget metadata
+    main/res/drawable/
+      widget_background.xml - Widget background shape
 ```
 
 ## Key Features
@@ -44,6 +58,12 @@ constants/
 - Calendar view with day detail sheets
 - Streak tracking with encouraging messages
 - Dual-reminder notification system (pick task + complete task)
+- Home screen widget (iOS + Android) showing today's task, streak, and encouraging messages
+  - Requires EAS/dev build (not available in Expo Go)
+  - Uses @bittingz/expo-widgets config plugin
+  - Data shared via react-native-shared-group-preferences (App Groups on iOS, SharedPreferences on Android)
+  - Widget data synced from AppContext on every task/profile change
+  - In-app tip banner shown once after first task completion (non-web only)
 
 ## Design
 - Warm minimalist aesthetic (cream background, golden amber accent)
@@ -67,3 +87,7 @@ constants/
 - Added animated launch screen with sunrise logo and rotating taglines (tappable to skip)
 - Replaced app logo with "Organic Check" — hand-drawn checkmark SVG used across app icon, launch screen (draw animation), onboarding, empty state watermark, and task completion cards
 - OrganicCheck component (components/OrganicCheck.tsx) supports animated stroke-dashoffset draw, configurable size/color/opacity
+- Added home screen widget (iOS Swift + Android Kotlin) with task display, streak counter, and state-based encouraging messages
+- Added widget data sync utility (lib/widgetData.ts) integrated into AppContext
+- Added in-app widget tip banner in completed state (shows once, dismissible)
+- Removed Expo splash screen image (plain cream background before custom launch screen)

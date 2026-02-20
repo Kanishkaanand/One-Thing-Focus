@@ -45,6 +45,7 @@ import {
 import { createLogger } from '@/lib/errorReporting';
 import { useScreenAnalytics } from '@/lib/useAnalytics';
 import { trackProofUploaded, trackProofSkipped } from '@/lib/analytics';
+import { hasWidgetTipBeenShown, markWidgetTipShown } from '@/lib/widgetData';
 import {
   TaskInputModal,
   ProofSheet,
@@ -461,6 +462,7 @@ export default function HomeScreen() {
   const [proofViewUri, setProofViewUri] = useState<string | null>(null);
   const [playAnimation, setPlayAnimation] = useState(false);
   const [proofToast, setProofToast] = useState(false);
+  const [showWidgetTip, setShowWidgetTip] = useState(false);
   const justCompletedRef = useRef(false);
   const pendingCelebrationRef = useRef(false);
 
@@ -525,6 +527,19 @@ export default function HomeScreen() {
       router.replace('/onboarding');
     }
   }, [isLoading, profile]);
+
+  useEffect(() => {
+    if (allDone && Platform.OS !== 'web') {
+      hasWidgetTipBeenShown().then(shown => {
+        if (!shown) setShowWidgetTip(true);
+      });
+    }
+  }, [allDone]);
+
+  const handleDismissWidgetTip = () => {
+    setShowWidgetTip(false);
+    markWidgetTipShown();
+  };
 
   const handleAddTask = async () => {
     if (!taskInput.trim()) return;
@@ -773,6 +788,28 @@ export default function HomeScreen() {
                     &quot;{todayEntry.reflection.note}&quot;
                   </Text>
                 ) : null}
+              </Animated.View>
+            )}
+
+            {showWidgetTip && (
+              <Animated.View entering={FadeInDown.delay(600).duration(400)} style={styles.widgetTipBanner}>
+                <View style={styles.widgetTipHeader}>
+                  <Feather name="smartphone" size={18} color={Colors.accent} />
+                  <Text style={styles.widgetTipTitle}>Stay on track</Text>
+                  <Pressable
+                    onPress={handleDismissWidgetTip}
+                    hitSlop={12}
+                    style={styles.widgetTipClose}
+                  >
+                    <Feather name="x" size={16} color={Colors.textSecondary} />
+                  </Pressable>
+                </View>
+                <Text style={styles.widgetTipText}>
+                  Add the One Thing widget to your home screen to keep your daily task visible at a glance.
+                </Text>
+                <Text style={styles.widgetTipHow}>
+                  Long-press your home screen → Widgets → One Thing
+                </Text>
               </Animated.View>
             )}
 
@@ -1561,5 +1598,41 @@ const styles = StyleSheet.create({
     fontFamily: 'Nunito_600SemiBold',
     fontSize: 16,
     color: '#FFF',
+  },
+  widgetTipBanner: {
+    backgroundColor: Colors.accentLight,
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: Colors.accent + '20',
+  },
+  widgetTipHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  widgetTipTitle: {
+    fontFamily: 'Nunito_700Bold',
+    fontSize: 15,
+    color: Colors.textPrimary,
+    flex: 1,
+  },
+  widgetTipClose: {
+    padding: 4,
+  },
+  widgetTipText: {
+    fontFamily: 'DMSans_400Regular',
+    fontSize: 14,
+    color: Colors.textPrimary,
+    lineHeight: 20,
+    marginBottom: 6,
+  },
+  widgetTipHow: {
+    fontFamily: 'DMSans_400Regular',
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontStyle: 'italic',
   },
 });
