@@ -58,7 +58,32 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "@bittingz/expo-widgets",
+        {
+          "ios": {
+            "src": "./widgets/ios",
+            "devTeamId": "REPLACE_WITH_YOUR_TEAM_ID",
+            "mode": "production",
+            "moduleDependencies": [],
+            "useLiveActivities": false,
+            "frequentUpdates": false,
+            "entitlements": {
+              "com.apple.security.application-groups": ["group.com.kanishkaanand.onethingfocus"]
+            }
+          },
+          "android": {
+            "src": "./widgets/android",
+            "widgets": [
+              {
+                "name": "OneThingWidgetProvider",
+                "resourceName": "@xml/one_thing_widget_info"
+              }
+            ]
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

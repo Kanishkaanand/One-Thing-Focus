@@ -32,6 +32,7 @@
     "ios": "expo run:ios"
   },
   "dependencies": {
+    "@bittingz/expo-widgets": "^3.0.2",
     "@expo-google-fonts/dm-sans": "^0.4.2",
     "@expo-google-fonts/nunito": "^0.4.2",
     "@expo/vector-icons": "^15.0.3",
@@ -76,6 +77,7 @@
     "react-native-reanimated": "~4.1.1",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
+    "react-native-shared-group-preferences": "^1.1.24",
     "react-native-svg": "15.12.1",
     "react-native-web": "^0.21.0",
     "react-native-worklets": "0.5.1",
