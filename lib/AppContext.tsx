@@ -20,6 +20,7 @@ import { createLogger } from './errorReporting';
 const logger = createLogger('AppContext');
 import { syncNotifications, rescheduleAllReminders } from './notifications';
 import { validateTaskInput, validateNoteInput, validateMood, type MoodType } from './validation';
+import { syncWidgetData } from './widgetData';
 import {
   initAnalytics,
   trackAppOpened,
@@ -98,6 +99,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setTodayEntry(currentTodayEntry);
 
       await syncNotifications(prof, currentTodayEntry);
+      syncWidgetData(prof, currentTodayEntry);
 
       // Check storage quota
       const quota = await checkStorageQuota();
@@ -163,6 +165,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     trackTaskCreated(profile.currentLevel, updated.tasks.length);
 
     await syncNotifications(profile, updated);
+    syncWidgetData(profile, updated);
   }, [profile, todayEntry]);
 
   const completeTask = useCallback(async (taskId: string, proof?: TaskItem['proof']) => {
@@ -219,6 +222,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setEntries(prev => ({ ...prev, [todayEntry.date]: updated }));
 
     await syncNotifications(newProfile, updated);
+    syncWidgetData(newProfile, updated);
   }, [todayEntry, profile]);
 
   const addReflection = useCallback(async (mood: 'energized' | 'calm' | 'neutral' | 'tough', note?: string) => {
@@ -254,6 +258,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     if (profile) {
       await syncNotifications(profile, updated);
+      syncWidgetData(profile, updated);
     }
   }, [todayEntry, profile]);
 
