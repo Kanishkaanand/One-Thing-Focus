@@ -3,8 +3,8 @@ import { Platform, Linking } from 'react-native';
 import { DailyEntry, UserProfile } from './storage';
 
 const PICK_TASK_ID = 'pick-task-reminder';
-const WRAP_UP_ID = 'wrap-up-reminder';
-const FOCUS_NUDGE_PREFIX = 'focus-nudge-';
+const TASK_NUDGE_PREFIX = 'task-nudge-';
+const WRAP_UP_PREFIX = 'wrap-up-';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -28,16 +28,28 @@ const pickTaskMessagesNoName = [
   "Just one thing. That's all. Whenever you're ready.",
 ];
 
-const focusNudgeMessages = [
+const taskNudgeMessages = [
   "It's time. Your one thing: TASK",
   "Now's the moment. TASK",
   "NAME, you said TIME. Here it is. TASK",
 ];
 
-const focusNudgeMessagesNoName = [
+const taskNudgeMessagesNoName = [
   "It's time. Your one thing: TASK",
   "Now's the moment. TASK",
   "Time to start: TASK",
+];
+
+const taskNudgeAutoMessages = [
+  "Hey NAME, still have your one thing: TASK",
+  "Gentle nudge: TASK",
+  "Your one thing is waiting: TASK",
+];
+
+const taskNudgeAutoMessagesNoName = [
+  "Still have your one thing: TASK",
+  "Gentle nudge: TASK",
+  "Your one thing is waiting: TASK",
 ];
 
 const wrapUpMessages = [
@@ -57,6 +69,10 @@ function formatTime12h(time24: string): string {
   if (h === 0) h = 12;
   else if (h > 12) h -= 12;
   return `${h}:${mStr} ${ampm}`;
+}
+
+function isAfter9PM(date: Date): boolean {
+  return date.getHours() >= 21;
 }
 
 export async function requestNotificationPermissions(): Promise<boolean> {
@@ -124,10 +140,11 @@ export async function schedulePickTaskReminder(
   });
 }
 
-export async function scheduleFocusNudge(
+export async function scheduleTaskNudge(
   taskId: string,
   taskText: string,
-  scheduledTime: string,
+  scheduledTime: string | undefined,
+  taskCreatedAt: string,
   name?: string,
 ): Promise<void> {
   if (Platform.OS === 'web') return;
@@ -135,75 +152,82 @@ export async function scheduleFocusNudge(
   const { granted } = await getNotificationPermissionStatus();
   if (!granted) return;
 
-  const identifier = `${FOCUS_NUDGE_PREFIX}${taskId}`;
+  const nudgeId = `${TASK_NUDGE_PREFIX}${taskId}`;
+  const wrapUpId = `${WRAP_UP_PREFIX}${taskId}`;
 
   try {
-    await Notifications.cancelScheduledNotificationAsync(identifier);
+    await Notifications.cancelScheduledNotificationAsync(nudgeId);
+    await Notifications.cancelScheduledNotificationAsync(wrapUpId);
   } catch {}
 
-  const [hourStr, minuteStr] = scheduledTime.split(':');
-  const hour = parseInt(hourStr, 10);
-  const minute = parseInt(minuteStr, 10);
-
-  if (hour >= 21) return;
-
   const now = new Date();
-  const target = new Date();
-  target.setHours(hour, minute, 0, 0);
+  let nudgeTime: Date;
 
-  if (target.getTime() <= now.getTime()) return;
+  if (scheduledTime) {
+    const [hourStr, minuteStr] = scheduledTime.split(':');
+    nudgeTime = new Date();
+    nudgeTime.setHours(parseInt(hourStr, 10), parseInt(minuteStr, 10), 0, 0);
 
-  const secondsUntil = Math.floor((target.getTime() - now.getTime()) / 1000);
+    if (nudgeTime.getTime() <= now.getTime()) return;
+  } else {
+    nudgeTime = new Date(new Date(taskCreatedAt).getTime() + 2 * 60 * 60 * 1000);
 
-  const messages = name ? focusNudgeMessages : focusNudgeMessagesNoName;
-  const body = pickRandom(messages)
-    .replace('TASK', taskText)
-    .replace('NAME', name || '')
-    .replace('TIME', formatTime12h(scheduledTime));
+    if (nudgeTime.getTime() <= now.getTime()) return;
+  }
+
+  if (isAfter9PM(nudgeTime)) return;
+
+  const secondsUntilNudge = Math.floor((nudgeTime.getTime() - now.getTime()) / 1000);
+
+  let nudgeBody: string;
+  if (scheduledTime) {
+    const messages = name ? taskNudgeMessages : taskNudgeMessagesNoName;
+    nudgeBody = pickRandom(messages)
+      .replace('TASK', taskText)
+      .replace('NAME', name || '')
+      .replace('TIME', formatTime12h(scheduledTime));
+  } else {
+    const messages = name ? taskNudgeAutoMessages : taskNudgeAutoMessagesNoName;
+    nudgeBody = pickRandom(messages)
+      .replace('TASK', taskText)
+      .replace('NAME', name || '');
+  }
 
   await Notifications.scheduleNotificationAsync({
-    identifier,
+    identifier: nudgeId,
     content: {
       title: 'One Thing',
-      body,
+      body: nudgeBody,
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-      seconds: secondsUntil,
+      seconds: secondsUntilNudge,
       repeats: false,
     },
   });
-}
 
-export async function scheduleWrapUpReminder(
-  time: string,
-  taskText?: string,
-  name?: string,
-): Promise<void> {
-  if (Platform.OS === 'web') return;
+  const wrapUpTime = new Date(nudgeTime.getTime() + 2 * 60 * 60 * 1000);
 
-  await cancelWrapUpReminder();
+  if (!isAfter9PM(wrapUpTime)) {
+    const secondsUntilWrapUp = Math.floor((wrapUpTime.getTime() - now.getTime()) / 1000);
 
-  const [hourStr, minuteStr] = time.split(':');
-  const hour = parseInt(hourStr, 10);
-  const minute = parseInt(minuteStr, 10);
+    if (secondsUntilWrapUp > 0) {
+      const wrapUpBody = pickRandom(wrapUpMessages).replace('TASK', taskText);
 
-  if (hour >= 21) return;
-
-  const body = pickRandom(wrapUpMessages).replace('TASK', taskText || 'your task');
-
-  await Notifications.scheduleNotificationAsync({
-    identifier: WRAP_UP_ID,
-    content: {
-      title: 'One Thing',
-      body,
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour,
-      minute,
-    },
-  });
+      await Notifications.scheduleNotificationAsync({
+        identifier: wrapUpId,
+        content: {
+          title: 'One Thing',
+          body: wrapUpBody,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: secondsUntilWrapUp,
+          repeats: false,
+        },
+      });
+    }
+  }
 }
 
 export async function cancelPickTaskReminder(): Promise<void> {
@@ -213,42 +237,27 @@ export async function cancelPickTaskReminder(): Promise<void> {
   } catch {}
 }
 
-export async function cancelWrapUpReminder(): Promise<void> {
+export async function cancelTaskNudge(taskId: string): Promise<void> {
   if (Platform.OS === 'web') return;
   try {
-    await Notifications.cancelScheduledNotificationAsync(WRAP_UP_ID);
+    await Notifications.cancelScheduledNotificationAsync(`${TASK_NUDGE_PREFIX}${taskId}`);
+    await Notifications.cancelScheduledNotificationAsync(`${WRAP_UP_PREFIX}${taskId}`);
   } catch {}
 }
 
-export async function cancelFocusNudge(taskId: string): Promise<void> {
-  if (Platform.OS === 'web') return;
-  try {
-    await Notifications.cancelScheduledNotificationAsync(`${FOCUS_NUDGE_PREFIX}${taskId}`);
-  } catch {}
-}
-
-export async function cancelAllFocusNudges(tasks: { id: string }[]): Promise<void> {
+export async function cancelAllTaskNudges(tasks: { id: string }[]): Promise<void> {
   if (Platform.OS === 'web') return;
   for (const task of tasks) {
-    await cancelFocusNudge(task.id);
+    await cancelTaskNudge(task.id);
   }
 }
 
 export async function cancelAllReminders(tasks?: { id: string }[]): Promise<void> {
   if (Platform.OS === 'web') return;
   await cancelPickTaskReminder();
-  await cancelWrapUpReminder();
   if (tasks) {
-    await cancelAllFocusNudges(tasks);
+    await cancelAllTaskNudges(tasks);
   }
-}
-
-function isWithinOneHour(time1: string, time2: string): boolean {
-  const [h1, m1] = time1.split(':').map(Number);
-  const [h2, m2] = time2.split(':').map(Number);
-  const mins1 = h1 * 60 + m1;
-  const mins2 = h2 * 60 + m2;
-  return Math.abs(mins1 - mins2) <= 60;
 }
 
 export async function syncNotifications(
@@ -260,18 +269,14 @@ export async function syncNotifications(
   const { granted } = await getNotificationPermissionStatus();
   if (!granted) return;
 
-  const pickEnabled = profile.reminderPickTask.enabled;
-  const focusEnabled = profile.reminderFocusNudge.enabled;
-  const wrapUpEnabled = profile.reminderWrapUp.enabled;
   const name = profile.name || undefined;
 
   if (!todayEntry || todayEntry.tasks.length === 0) {
-    if (pickEnabled) {
+    if (profile.reminderPickTask.enabled) {
       await schedulePickTaskReminder(profile.reminderPickTask.time, name);
     } else {
       await cancelPickTaskReminder();
     }
-    await cancelWrapUpReminder();
     return;
   }
 
@@ -282,41 +287,20 @@ export async function syncNotifications(
 
   await cancelPickTaskReminder();
 
-  const incompleteTasks = todayEntry.tasks.filter(t => !t.isCompleted);
-  const firstIncomplete = incompleteTasks[0];
-
-  if (focusEnabled) {
-    for (const task of todayEntry.tasks) {
-      if (task.isCompleted) {
-        await cancelFocusNudge(task.id);
-      } else if (task.scheduledTime) {
-        await scheduleFocusNudge(task.id, task.text, task.scheduledTime, name);
-      }
-    }
-  } else {
-    await cancelAllFocusNudges(todayEntry.tasks);
-  }
-
-  if (wrapUpEnabled && incompleteTasks.length > 0) {
-    const taskWithTime = incompleteTasks.find(t => t.scheduledTime);
-    const shouldSkipWrapUp = taskWithTime?.scheduledTime &&
-      isWithinOneHour(taskWithTime.scheduledTime, profile.reminderWrapUp.time);
-
-    if (!shouldSkipWrapUp) {
-      await scheduleWrapUpReminder(
-        profile.reminderWrapUp.time,
-        firstIncomplete?.text,
+  for (const task of todayEntry.tasks) {
+    if (task.isCompleted) {
+      await cancelTaskNudge(task.id);
+    } else {
+      await scheduleTaskNudge(
+        task.id,
+        task.text,
+        task.scheduledTime,
+        task.createdAt,
         name,
       );
-    } else {
-      await cancelWrapUpReminder();
     }
-  } else {
-    await cancelWrapUpReminder();
   }
 }
-
-export { cancelFocusNudge as cancelTaskTimeNotification };
 
 export async function rescheduleAllReminders(profile: UserProfile, todayEntry?: DailyEntry | null): Promise<void> {
   if (Platform.OS === 'web') return;
@@ -333,11 +317,5 @@ export async function rescheduleAllReminders(profile: UserProfile, todayEntry?: 
     await schedulePickTaskReminder(profile.reminderPickTask.time, profile.name || undefined);
   } else {
     await cancelPickTaskReminder();
-  }
-
-  if (profile.reminderWrapUp.enabled) {
-    await scheduleWrapUpReminder(profile.reminderWrapUp.time);
-  } else {
-    await cancelWrapUpReminder();
   }
 }
