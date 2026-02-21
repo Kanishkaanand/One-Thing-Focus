@@ -225,6 +225,7 @@ export default function OnboardingScreen() {
       });
       trackOnboardingCompleted(!!name.trim(), false);
       setTimeout(() => router.replace('/(tabs)'), 1500);
+    }
   };
 
   const handleSkipReminders = async () => {
