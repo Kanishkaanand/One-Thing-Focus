@@ -4,4 +4,3 @@ export type { ProofOption } from './ProofSheet';
 export { default as ReflectionModal } from './ReflectionModal';
 export type { MoodType } from './ReflectionModal';
 export { default as ProofViewModal } from './ProofViewModal';
-export { default as TimePickerModal } from './TimePickerModal';

@@ -141,7 +141,7 @@ export default function ProfileScreen() {
   const [nameInput, setNameInput] = useState('');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [notifStatus, setNotifStatus] = useState<{ granted: boolean; canAskAgain: boolean }>({ granted: true, canAskAgain: true });
-  const [timePickerTarget, setTimePickerTarget] = useState<'pick' | 'complete' | null>(null);
+  const [timePickerTarget, setTimePickerTarget] = useState<'pick' | 'wrapup' | null>(null);
 
   // Track screen views
   useScreenAnalytics('Profile');
@@ -197,7 +197,7 @@ export default function ProfileScreen() {
     await rescheduleAllReminders(newProfile, todayEntry);
   };
 
-  const handleToggleCompleteReminder = async (value: boolean) => {
+  const handleToggleFocusNudge = async (value: boolean) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     if (value && !notifStatus.granted) {
@@ -208,10 +208,28 @@ export default function ProfileScreen() {
       setNotifStatus({ granted: true, canAskAgain: true });
     }
 
-    const updated = { ...profile.reminderCompleteTask, enabled: value };
-    await updateProfile({ reminderCompleteTask: updated });
-    trackReminderToggled('complete', value);
-    const newProfile = { ...profile, reminderCompleteTask: updated };
+    const updated = { enabled: value };
+    await updateProfile({ reminderFocusNudge: updated });
+    trackReminderToggled('focus', value);
+    const newProfile = { ...profile, reminderFocusNudge: updated };
+    await rescheduleAllReminders(newProfile, todayEntry);
+  };
+
+  const handleToggleWrapUpReminder = async (value: boolean) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    if (value && !notifStatus.granted) {
+      const granted = await requestNotificationPermissions();
+      if (!granted) {
+        return;
+      }
+      setNotifStatus({ granted: true, canAskAgain: true });
+    }
+
+    const updated = { ...profile.reminderWrapUp, enabled: value };
+    await updateProfile({ reminderWrapUp: updated });
+    trackReminderToggled('wrapup', value);
+    const newProfile = { ...profile, reminderWrapUp: updated };
     await rescheduleAllReminders(newProfile, todayEntry);
   };
 
@@ -221,10 +239,10 @@ export default function ProfileScreen() {
       await updateProfile({ reminderPickTask: updated });
       const newProfile = { ...profile, reminderPickTask: updated };
       await rescheduleAllReminders(newProfile, todayEntry);
-    } else if (timePickerTarget === 'complete') {
-      const updated = { ...profile.reminderCompleteTask, time };
-      await updateProfile({ reminderCompleteTask: updated });
-      const newProfile = { ...profile, reminderCompleteTask: updated };
+    } else if (timePickerTarget === 'wrapup') {
+      const updated = { ...profile.reminderWrapUp, time };
+      await updateProfile({ reminderWrapUp: updated });
+      const newProfile = { ...profile, reminderWrapUp: updated };
       await rescheduleAllReminders(newProfile, todayEntry);
     }
   };
@@ -357,20 +375,40 @@ export default function ProfileScreen() {
 
           <View style={styles.settingRow}>
             <View style={styles.settingLeft}>
-              <Feather name="sunset" size={18} color={Colors.textSecondary} />
-              <Text style={styles.settingText}>Complete your task</Text>
+              <Feather name="clock" size={18} color={Colors.textSecondary} />
+              <Text style={styles.settingText}>Focus nudge</Text>
             </View>
             <View style={styles.settingRight}>
-              {profile.reminderCompleteTask.enabled && (
-                <Pressable onPress={() => setTimePickerTarget('complete')} style={styles.settingTimeChip}>
-                  <Text style={styles.settingTimeText}>{formatTime12h(profile.reminderCompleteTask.time)}</Text>
+              {profile.reminderFocusNudge.enabled && (
+                <View style={styles.settingTimeChip}>
+                  <Text style={styles.settingTimeText}>Auto</Text>
+                </View>
+              )}
+              <Switch
+                value={profile.reminderFocusNudge.enabled}
+                onValueChange={handleToggleFocusNudge}
+                trackColor={{ false: Colors.neutral, true: Colors.accent + '60' }}
+                thumbColor={profile.reminderFocusNudge.enabled ? Colors.accent : Colors.surface}
+              />
+            </View>
+          </View>
+
+          <View style={styles.settingRow}>
+            <View style={styles.settingLeft}>
+              <Feather name="sunset" size={18} color={Colors.textSecondary} />
+              <Text style={styles.settingText}>Wrap up</Text>
+            </View>
+            <View style={styles.settingRight}>
+              {profile.reminderWrapUp.enabled && (
+                <Pressable onPress={() => setTimePickerTarget('wrapup')} style={styles.settingTimeChip}>
+                  <Text style={styles.settingTimeText}>{formatTime12h(profile.reminderWrapUp.time)}</Text>
                 </Pressable>
               )}
               <Switch
-                value={profile.reminderCompleteTask.enabled}
-                onValueChange={handleToggleCompleteReminder}
+                value={profile.reminderWrapUp.enabled}
+                onValueChange={handleToggleWrapUpReminder}
                 trackColor={{ false: Colors.neutral, true: Colors.accent + '60' }}
-                thumbColor={profile.reminderCompleteTask.enabled ? Colors.accent : Colors.surface}
+                thumbColor={profile.reminderWrapUp.enabled ? Colors.accent : Colors.surface}
               />
             </View>
           </View>
@@ -443,8 +481,8 @@ export default function ProfileScreen() {
         value={
           timePickerTarget === 'pick'
             ? profile.reminderPickTask.time
-            : timePickerTarget === 'complete'
-            ? profile.reminderCompleteTask.time
+            : timePickerTarget === 'wrapup'
+            ? profile.reminderWrapUp.time
             : '08:00'
         }
         onClose={() => setTimePickerTarget(null)}

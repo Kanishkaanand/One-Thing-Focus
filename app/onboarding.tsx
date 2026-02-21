@@ -178,7 +178,7 @@ export default function OnboardingScreen() {
   const [showReminderSetup, setShowReminderSetup] = useState(false);
   const [name, setName] = useState('');
   const [pickTime, setPickTime] = useState('08:00');
-  const [completeTime, setCompleteTime] = useState('18:00');
+  const [wrapUpTime, setWrapUpTime] = useState('19:00');
   const [permissionDenied, setPermissionDenied] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
@@ -208,7 +208,8 @@ export default function OnboardingScreen() {
         onboardingComplete: true,
         createdAt: new Date().toISOString(),
         reminderPickTask: { enabled: true, time: pickTime },
-        reminderCompleteTask: { enabled: true, time: completeTime },
+        reminderFocusNudge: { enabled: true },
+        reminderWrapUp: { enabled: true, time: wrapUpTime },
       });
       trackOnboardingCompleted(!!name.trim(), true);
       router.replace('/(tabs)');
@@ -219,11 +220,11 @@ export default function OnboardingScreen() {
         onboardingComplete: true,
         createdAt: new Date().toISOString(),
         reminderPickTask: { enabled: false, time: pickTime },
-        reminderCompleteTask: { enabled: false, time: completeTime },
+        reminderFocusNudge: { enabled: false },
+        reminderWrapUp: { enabled: false, time: wrapUpTime },
       });
       trackOnboardingCompleted(!!name.trim(), false);
       setTimeout(() => router.replace('/(tabs)'), 1500);
-    }
   };
 
   const handleSkipReminders = async () => {
@@ -232,7 +233,8 @@ export default function OnboardingScreen() {
       onboardingComplete: true,
       createdAt: new Date().toISOString(),
       reminderPickTask: { enabled: false, time: pickTime },
-      reminderCompleteTask: { enabled: false, time: completeTime },
+      reminderFocusNudge: { enabled: false },
+      reminderWrapUp: { enabled: false, time: wrapUpTime },
     });
     trackOnboardingCompleted(!!name.trim(), false);
     router.replace('/(tabs)');
@@ -250,7 +252,7 @@ export default function OnboardingScreen() {
           </View>
           <Text style={styles.reminderTitle}>Stay on track, gently.</Text>
           <Text style={styles.reminderSubtitle}>
-            We&apos;ll send you two quiet nudges each day - one to pick your task, one to finish it.
+            We&apos;ll send you three gentle nudges — morning, focus time, and evening.
           </Text>
 
           <View style={styles.reminderOptions}>
@@ -264,10 +266,21 @@ export default function OnboardingScreen() {
 
             <View style={styles.reminderRow}>
               <View style={styles.reminderLabel}>
-                <Feather name="sunset" size={16} color={Colors.textSecondary} />
-                <Text style={styles.reminderLabelText}>Finish your task</Text>
+                <Feather name="clock" size={16} color={Colors.textSecondary} />
+                <Text style={styles.reminderLabelText}>Focus nudge</Text>
               </View>
-              <TimePickerInline value={completeTime} onChange={setCompleteTime} />
+              <View style={styles.timeChip}>
+                <Feather name="zap" size={14} color={Colors.accent} />
+                <Text style={styles.timeChipText}>Auto</Text>
+              </View>
+            </View>
+
+            <View style={styles.reminderRow}>
+              <View style={styles.reminderLabel}>
+                <Feather name="sunset" size={16} color={Colors.textSecondary} />
+                <Text style={styles.reminderLabelText}>Wrap up</Text>
+              </View>
+              <TimePickerInline value={wrapUpTime} onChange={setWrapUpTime} />
             </View>
           </View>
 

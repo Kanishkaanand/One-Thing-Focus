@@ -39,7 +39,7 @@ interface AppContextValue {
   isLoading: boolean;
   storageStatus: StorageStatus | null;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
-  addTask: (text: string) => Promise<void>;
+  addTask: (text: string, scheduledTime?: string) => Promise<void>;
   completeTask: (taskId: string, proof?: TaskItem['proof']) => Promise<void>;
   addReflection: (mood: 'energized' | 'calm' | 'neutral' | 'tough', note?: string) => Promise<void>;
   canAddMoreTasks: boolean;
@@ -127,10 +127,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setProfile(newProfile);
   }, [profile]);
 
-  const addTask = useCallback(async (text: string) => {
+  const addTask = useCallback(async (text: string, scheduledTime?: string) => {
     if (!profile) return;
 
-    // Validate and sanitize input
     const validation = validateTaskInput(text);
     if (!validation.valid) {
       throw new Error(validation.error);
@@ -150,6 +149,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       text: sanitizedText,
       createdAt: new Date().toISOString(),
       isCompleted: false,
+      ...(scheduledTime ? { scheduledTime } : {}),
     };
 
     const updated: DailyEntry = {
@@ -161,7 +161,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setTodayEntry(updated);
     setEntries(prev => ({ ...prev, [today]: updated }));
 
-    // Track task creation
     trackTaskCreated(profile.currentLevel, updated.tasks.length);
 
     await syncNotifications(profile, updated);

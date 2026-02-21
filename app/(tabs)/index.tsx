@@ -51,11 +51,9 @@ import {
   ProofSheet,
   ReflectionModal,
   ProofViewModal,
-  TimePickerModal,
   type ProofOption,
   type MoodType,
 } from '@/components/modals';
-import { scheduleTaskTimeNotification, cancelTaskTimeNotification } from '@/lib/notifications';
 import StorageWarningBanner from '@/components/StorageWarningBanner';
 
 const logger = createLogger('HomeScreen');
@@ -486,8 +484,6 @@ export default function HomeScreen() {
   const [playAnimation, setPlayAnimation] = useState(false);
   const [proofToast, setProofToast] = useState(false);
   const [showWidgetTip, setShowWidgetTip] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
-  const [pendingTaskName, setPendingTaskName] = useState('');
   const justCompletedRef = useRef(false);
   const pendingCelebrationRef = useRef(false);
 
@@ -566,40 +562,17 @@ export default function HomeScreen() {
     markWidgetTipShown();
   };
 
-  const handleAddTask = async () => {
+  const handleAddTask = async (scheduledTime?: string) => {
     if (!taskInput.trim()) return;
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       const trimmed = taskInput.trim();
-      await addTask(trimmed);
-      setPendingTaskName(trimmed);
+      await addTask(trimmed, scheduledTime);
       setTaskInput('');
       setShowInput(false);
-      setShowTimePicker(true);
     } catch (e) {
       logger.error(e instanceof Error ? e : new Error(String(e)), 'addTask');
     }
-  };
-
-  const handleSetTaskTime = async (time: string) => {
-    setShowTimePicker(false);
-    if (!todayEntry) return;
-    const lastTask = todayEntry.tasks[todayEntry.tasks.length - 1];
-    if (!lastTask) return;
-
-    const updatedTasks = todayEntry.tasks.map(t =>
-      t.id === lastTask.id ? { ...t, scheduledTime: time } : t
-    );
-    const updated: DailyEntry = { ...todayEntry, tasks: updatedTasks };
-    await saveEntry(updated);
-    await refreshData();
-
-    await scheduleTaskTimeNotification(lastTask.id, lastTask.text, time);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  };
-
-  const handleSkipTimePicker = () => {
-    setShowTimePicker(false);
   };
 
   const handleCompleteTask = (taskId: string) => {
@@ -934,13 +907,7 @@ export default function HomeScreen() {
         onChangeText={setTaskInput}
         onSubmit={handleAddTask}
         onClose={() => setShowInput(false)}
-      />
-
-      <TimePickerModal
-        visible={showTimePicker}
-        taskName={pendingTaskName}
-        onSetTime={handleSetTaskTime}
-        onSkip={handleSkipTimePicker}
+        focusNudgeEnabled={profile?.reminderFocusNudge?.enabled}
       />
 
       <ProofSheet
