@@ -57,7 +57,7 @@ widgets/
 - Completed state (State C): calm completion screen with sage green card accent, animated checkmark, contextual messages (generic/streak/level-up), journal-style reflection, intentional empty space, "See you tomorrow" footer
 - Calendar view with day detail sheets
 - Streak tracking with encouraging messages
-- Dual-reminder notification system (pick task + complete task)
+- Simplified notification system: 1 toggle (Pick your task, morning reminder) + always-on task nudges (at user-selected time or 2hrs after creation, with automatic wrap-up 2hrs later if incomplete; no notifications after 9PM)
 - Home screen widget (iOS + Android) showing today's task, streak, and encouraging messages
   - Requires EAS/dev build (not available in Expo Go)
   - Uses @bittingz/expo-widgets config plugin
@@ -73,10 +73,10 @@ widgets/
 
 ## Recent Changes
 - Initial build: Full app implementation with onboarding, home, calendar, profile screens
-- Redesigned 3-reminder notification system: Pick Task (morning), Focus Nudge (auto 2hrs after task creation), Wrap Up (evening) with anti-spam logic
-- TaskInputModal has inline time picker pills (Morning/Afternoon/Evening/Custom) for scheduling focus nudges
-- Profile shows 3 reminder toggles; Focus Nudge shows "Auto" timing indicator
-- Data model: reminderFocusNudge: { enabled }, reminderWrapUp: { enabled, time } (replaced old reminderCompleteTask)
+- Simplified to 2-notification system: Pick Task (morning, toggled in Profile) + always-on task nudges (at user-selected time OR 2hrs after creation, with wrap-up nudge 2hrs later if incomplete; 9PM cutoff)
+- TaskInputModal has inline time picker pills (Morning/Afternoon/Evening/Custom) — always visible, unselected by default
+- Profile shows 1 reminder toggle: "Pick your task" with time picker
+- Data model: only reminderPickTask: { enabled, time } — removed reminderFocusNudge and reminderWrapUp (task nudges are always-on behavior)
 - Added completed state (State C) for home screen with animated checkmark, contextual completion messages, journal-style reflection, and "See you tomorrow" footer
 - Enhanced celebration overlay: floating emoji particles, bounce animation, streak badge, bigger icon with emoji
 - Added emojis to footer: moon emoji, "Rest up, you earned it" sparkle subtext
