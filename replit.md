@@ -74,7 +74,9 @@ widgets/
 ## Recent Changes
 - Initial build: Full app implementation with onboarding, home, calendar, profile screens
 - Simplified to 2-notification system: Pick Task (morning, toggled in Profile) + always-on task nudges (at user-selected time OR 2hrs after creation, with wrap-up nudge 2hrs later if incomplete; 9PM cutoff)
-- TaskInputModal has inline time picker pills (Morning/Afternoon/Evening/Custom) — always visible, unselected by default
+- TaskInputModal has progressive disclosure: "When do you want to do this?" prompt with "Pick a time" button (default hidden) and skip option
+- Time pills (Morning/Afternoon/Evening/Custom) now revealed only when user taps "Pick a time"
+- After selecting a time, picker auto-collapses to confirmation chip showing "Nudge at [time]" with "Change" button
 - Profile shows 1 reminder toggle: "Pick your task" with time picker
 - Data model: only reminderPickTask: { enabled, time } — removed reminderFocusNudge and reminderWrapUp (task nudges are always-on behavior)
 - Added completed state (State C) for home screen with animated checkmark, contextual completion messages, journal-style reflection, and "See you tomorrow" footer
