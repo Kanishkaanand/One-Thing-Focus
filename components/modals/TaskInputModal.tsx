@@ -11,7 +11,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeIn, FadeOut } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import Colors from '@/constants/colors';
 
@@ -67,12 +67,14 @@ function TaskInputModal({
   const [customHour, setCustomHour] = useState(10);
   const [customMinute, setCustomMinute] = useState(0);
   const [showCustomPicker, setShowCustomPicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   const resetState = useCallback(() => {
     setSelectedPill(null);
     setCustomHour(10);
     setCustomMinute(0);
     setShowCustomPicker(false);
+    setShowTimePicker(false);
   }, []);
 
   const handleClose = () => {
@@ -113,6 +115,12 @@ function TaskInputModal({
     } else {
       setShowCustomPicker(false);
     }
+  };
+
+  const handleClearTime = () => {
+    setSelectedPill(null);
+    setShowCustomPicker(false);
+    setShowTimePicker(false);
   };
 
   const confirmationTimeLabel = selectedPill
@@ -171,10 +179,39 @@ function TaskInputModal({
             </Pressable>
           </View>
 
-          <Animated.View entering={FadeIn.duration(200)} style={styles.nudgeSection}>
+          {selectedPill && confirmationTimeLabel ? (
+            <Animated.View entering={FadeIn.duration(200)} style={styles.timeConfirmRow}>
+              <View style={styles.timeConfirmLeft}>
+                <Feather name="bell" size={13} color={Colors.accent} />
+                <Text style={styles.timeConfirmText}>
+                  Nudge at {confirmationTimeLabel}
+                </Text>
+              </View>
+              <Pressable onPress={handleClearTime} style={styles.timeChangeBtn}>
+                <Text style={styles.timeChangeBtnText}>Change</Text>
+              </Pressable>
+            </Animated.View>
+          ) : !showTimePicker ? (
+            <Animated.View entering={FadeIn.duration(200)} style={styles.timePromptRow}>
+              <Text style={styles.timePromptText}>When do you want to do this?</Text>
+              <View style={styles.timePromptActions}>
+                <Pressable
+                  onPress={() => setShowTimePicker(true)}
+                  style={styles.pickTimeBtn}
+                >
+                  <Feather name="clock" size={13} color={Colors.accent} />
+                  <Text style={styles.pickTimeBtnText}>Pick a time</Text>
+                </Pressable>
+              </View>
+            </Animated.View>
+          ) : (
+            <Animated.View entering={FadeInDown.duration(200)} style={styles.nudgeSection}>
               <View style={styles.nudgeHeader}>
                 <Feather name="clock" size={14} color={Colors.textSecondary} />
-                <Text style={styles.nudgeLabel}>Focus nudge</Text>
+                <Text style={styles.nudgeLabel}>Pick a time</Text>
+                <Pressable onPress={() => { setShowTimePicker(false); setSelectedPill(null); setShowCustomPicker(false); }} style={styles.skipBtn}>
+                  <Text style={styles.skipBtnText}>Skip</Text>
+                </Pressable>
               </View>
 
               <View style={styles.pillRow}>
@@ -285,16 +322,8 @@ function TaskInputModal({
                   </View>
                 </Animated.View>
               )}
-
-              {selectedPill && confirmationTimeLabel && (
-                <Animated.View entering={FadeIn.duration(200)} style={styles.confirmLine}>
-                  <Feather name="bell" size={13} color={Colors.accent} />
-                  <Text style={styles.confirmText}>
-                    Nudge at {confirmationTimeLabel}
-                  </Text>
-                </Animated.View>
-              )}
             </Animated.View>
+          )}
         </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
@@ -358,6 +387,65 @@ const styles = StyleSheet.create({
   submitBtnDisabled: {
     opacity: 0.4,
   },
+  timePromptRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+  },
+  timePromptText: {
+    fontFamily: 'DMSans_400Regular',
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  timePromptActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  pickTimeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: Colors.accentLight,
+  },
+  pickTimeBtnText: {
+    fontFamily: 'DMSans_500Medium',
+    fontSize: 13,
+    color: Colors.accent,
+  },
+  timeConfirmRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+  },
+  timeConfirmLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  timeConfirmText: {
+    fontFamily: 'DMSans_500Medium',
+    fontSize: 13,
+    color: Colors.accent,
+  },
+  timeChangeBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: Colors.inputBg,
+  },
+  timeChangeBtnText: {
+    fontFamily: 'DMSans_500Medium',
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
   nudgeSection: {
     marginTop: 4,
     marginBottom: 8,
@@ -371,6 +459,18 @@ const styles = StyleSheet.create({
   nudgeLabel: {
     fontFamily: 'DMSans_400Regular',
     fontSize: 13,
+    color: Colors.textSecondary,
+    flex: 1,
+  },
+  skipBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: Colors.inputBg,
+  },
+  skipBtnText: {
+    fontFamily: 'DMSans_500Medium',
+    fontSize: 12,
     color: Colors.textSecondary,
   },
   pillRow: {
@@ -442,18 +542,6 @@ const styles = StyleSheet.create({
   },
   customOptionTextSelected: {
     fontFamily: 'DMSans_600SemiBold',
-    color: Colors.accent,
-  },
-  confirmLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 10,
-    paddingHorizontal: 4,
-  },
-  confirmText: {
-    fontFamily: 'DMSans_500Medium',
-    fontSize: 13,
     color: Colors.accent,
   },
 });
