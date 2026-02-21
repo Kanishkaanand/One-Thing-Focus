@@ -23,7 +23,6 @@ interface TaskInputModalProps {
   onChangeText: (text: string) => void;
   onSubmit: (scheduledTime?: string) => void;
   onClose: () => void;
-  focusNudgeEnabled?: boolean;
 }
 
 const TIME_PRESETS: { key: TimePillOption; label: string; icon: string; time: string }[] = [
@@ -60,7 +59,6 @@ function TaskInputModal({
   onChangeText,
   onSubmit,
   onClose,
-  focusNudgeEnabled = false,
 }: TaskInputModalProps) {
   const insets = useSafeAreaInsets();
   const isSubmitDisabled = !value.trim();
@@ -84,7 +82,7 @@ function TaskInputModal({
   };
 
   const getScheduledTime = (): string | undefined => {
-    if (!focusNudgeEnabled || !selectedPill) return undefined;
+    if (!selectedPill) return undefined;
 
     const preset = TIME_PRESETS.find(p => p.key === selectedPill);
     if (preset) return preset.time;
@@ -173,8 +171,7 @@ function TaskInputModal({
             </Pressable>
           </View>
 
-          {focusNudgeEnabled && (
-            <Animated.View entering={FadeIn.duration(200)} style={styles.nudgeSection}>
+          <Animated.View entering={FadeIn.duration(200)} style={styles.nudgeSection}>
               <View style={styles.nudgeHeader}>
                 <Feather name="clock" size={14} color={Colors.textSecondary} />
                 <Text style={styles.nudgeLabel}>Focus nudge</Text>
@@ -298,7 +295,6 @@ function TaskInputModal({
                 </Animated.View>
               )}
             </Animated.View>
-          )}
         </Animated.View>
       </KeyboardAvoidingView>
     </Modal>

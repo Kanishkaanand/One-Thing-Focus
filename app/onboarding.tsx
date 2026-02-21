@@ -107,8 +107,6 @@ export default function OnboardingScreen() {
       onboardingComplete: true,
       createdAt: new Date().toISOString(),
       reminderPickTask: { enabled: false, time: '08:00' },
-      reminderFocusNudge: { enabled: false },
-      reminderWrapUp: { enabled: false, time: '19:00' },
     });
     trackOnboardingCompleted(!!name.trim(), false);
     router.replace('/(tabs)');

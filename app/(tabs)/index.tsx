@@ -907,7 +907,6 @@ export default function HomeScreen() {
         onChangeText={setTaskInput}
         onSubmit={handleAddTask}
         onClose={() => setShowInput(false)}
-        focusNudgeEnabled={profile?.reminderFocusNudge?.enabled}
       />
 
       <ProofSheet
