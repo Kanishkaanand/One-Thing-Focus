@@ -315,7 +315,7 @@ export default function ProfileScreen() {
           <View style={styles.settingRow}>
             <View style={styles.settingLeft}>
               <Feather name="sunrise" size={18} color={Colors.textSecondary} />
-              <Text style={styles.settingText}>Pick your task</Text>
+              <Text style={styles.settingText}>Remind me to plan</Text>
             </View>
             <View style={styles.settingRight}>
               {profile.reminderPickTask.enabled && (

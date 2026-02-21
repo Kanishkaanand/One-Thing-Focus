@@ -28,7 +28,7 @@ import Animated, {
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
-import OrganicCheck from '@/components/OrganicCheck';
+import Logo from '@/components/Logo';
 import { useApp } from '@/lib/AppContext';
 import { useScreenAnalytics } from '@/lib/useAnalytics';
 import { trackOnboardingCompleted } from '@/lib/analytics';
@@ -245,25 +245,12 @@ function Slide1() {
 }
 
 function Slide2() {
-  const [animateCheck, setAnimateCheck] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setAnimateCheck(true), 600);
-    return () => clearTimeout(timer);
-  }, []);
-
   return (
     <View style={[styles.slide, { width: SCREEN_WIDTH }]}>
       <View style={styles.calmContainer}>
         <BreathingGlow />
         <Animated.View entering={FadeIn.delay(300).duration(600)} style={styles.checkWrap}>
-          <OrganicCheck
-            size={100}
-            color={Colors.accent}
-            animate={animateCheck}
-            animationDuration={900}
-            animationDelay={0}
-          />
+          <Logo size={100} />
         </Animated.View>
       </View>
 
@@ -336,7 +323,7 @@ export default function OnboardingScreen() {
             What should we call you?
           </Animated.Text>
           <Animated.Text entering={FadeInDown.delay(300).duration(400)} style={styles.nameSubtitle}>
-            Optional — skip anytime
+            No pressure — you can skip this
           </Animated.Text>
           <Animated.View entering={FadeInUp.delay(400).duration(400)} style={styles.nameInputWrap}>
             <TextInput
