@@ -112,8 +112,6 @@ describe('parseUserProfile', () => {
     reminderTime: '09:00',
     onboardingComplete: true,
     reminderPickTask: { enabled: true, time: '08:00' },
-    reminderFocusNudge: { enabled: true },
-    reminderWrapUp: { enabled: true, time: '19:00' },
   };
 
   it('should parse valid profile data', () => {

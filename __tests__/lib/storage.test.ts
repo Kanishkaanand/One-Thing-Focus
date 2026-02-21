@@ -203,8 +203,6 @@ describe('processEndOfDay', () => {
     reminderTime: '09:00',
     onboardingComplete: true,
     reminderPickTask: { enabled: false, time: '08:00' },
-    reminderFocusNudge: { enabled: false },
-    reminderWrapUp: { enabled: false, time: '19:00' },
   };
 
   it('should return unchanged profile if yesterday has no entry and no prior entries', async () => {
