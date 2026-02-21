@@ -17,8 +17,8 @@ function NativeTabLayout() {
         <Label>Today</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="calendar">
-        <Icon sf={{ default: "calendar", selected: "calendar" }} />
-        <Label>Calendar</Label>
+        <Icon sf={{ default: "map", selected: "map.fill" }} />
+        <Label>Journey</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
         <Icon sf={{ default: "person", selected: "person.fill" }} />
@@ -74,12 +74,12 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="calendar"
         options={{
-          title: "Calendar",
+          title: "Journey",
           tabBarIcon: ({ color, size }) =>
             isIOS ? (
-              <SymbolView name="calendar" tintColor={color} size={size} />
+              <SymbolView name="map" tintColor={color} size={size} />
             ) : (
-              <Ionicons name="calendar-outline" size={size} color={color} />
+              <Ionicons name="map-outline" size={size} color={color} />
             ),
         }}
       />
