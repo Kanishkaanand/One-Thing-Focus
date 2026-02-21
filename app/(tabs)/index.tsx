@@ -870,17 +870,6 @@ export default function HomeScreen() {
           </View>
         ) : (
           <Animated.View entering={FadeInDown.delay(400).duration(500)} style={styles.emptyState}>
-            <View style={styles.watermarkWrap}>
-              <OrganicCheck
-                size={200}
-                color={Colors.accent}
-                opacity={0.06}
-                showCircle={true}
-              />
-            </View>
-            <View style={styles.emptyIconWrap}>
-              <OrganicCheck size={56} color={Colors.accent} showCircle={true} />
-            </View>
             <Text style={styles.emptyTitle}>What&apos;s your one thing today?</Text>
             <Text style={styles.emptySubtitle}>
               Focus on just one task. That&apos;s all it takes.

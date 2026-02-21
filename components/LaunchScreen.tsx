@@ -6,7 +6,7 @@ import {
   Pressable,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import OrganicCheck from '@/components/OrganicCheck';
+import Logo from '@/components/Logo';
 import Colors from '@/constants/colors';
 
 const taglines = [
@@ -40,14 +40,13 @@ interface LaunchScreenProps {
 }
 
 export default function LaunchScreen({ onComplete }: LaunchScreenProps) {
-  const checkOpacity = useRef(new Animated.Value(0)).current;
+  const logoOpacity = useRef(new Animated.Value(0)).current;
   const nameOpacity = useRef(new Animated.Value(0)).current;
   const taglineOpacity = useRef(new Animated.Value(0)).current;
   const taglineTranslateY = useRef(new Animated.Value(10)).current;
   const screenOpacity = useRef(new Animated.Value(1)).current;
 
   const [tagline, setTagline] = useState('');
-  const [drawCheck, setDrawCheck] = useState(false);
   const animRef = useRef<Animated.CompositeAnimation | null>(null);
   const completedRef = useRef(false);
 
@@ -62,8 +61,7 @@ export default function LaunchScreen({ onComplete }: LaunchScreenProps) {
     pickRandomTagline().then(setTagline);
 
     const timer = setTimeout(() => {
-      setDrawCheck(true);
-      checkOpacity.setValue(1);
+      logoOpacity.setValue(1);
     }, 200);
 
     const anim = Animated.sequence([
@@ -100,21 +98,14 @@ export default function LaunchScreen({ onComplete }: LaunchScreenProps) {
     });
 
     return () => clearTimeout(timer);
-  }, [checkOpacity, finish, nameOpacity, screenOpacity, taglineOpacity, taglineTranslateY]);
+  }, [logoOpacity, finish, nameOpacity, screenOpacity, taglineOpacity, taglineTranslateY]);
 
   return (
     <Pressable onPress={finish} style={StyleSheet.absoluteFill}>
       <Animated.View style={[styles.container, { opacity: screenOpacity }]}>
         <View style={styles.content}>
-          <Animated.View style={[styles.checkWrap, { opacity: checkOpacity }]}>
-            <OrganicCheck
-              size={140}
-              color={Colors.accent}
-              animate={drawCheck}
-              animationDuration={800}
-              animationDelay={0}
-              showCircle={true}
-            />
+          <Animated.View style={[styles.logoWrap, { opacity: logoOpacity }]}>
+            <Logo size={140} />
           </Animated.View>
 
           <Animated.Text style={[styles.appName, { opacity: nameOpacity }]}>
@@ -150,7 +141,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 40,
   },
-  checkWrap: {
+  logoWrap: {
     marginBottom: 16,
   },
   appName: {
