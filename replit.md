@@ -84,7 +84,7 @@ widgets/
 - Added emojis to footer: moon emoji, "Rest up, you earned it" sparkle subtext
 - Added reset app data feature in profile settings with confirmation modal
 - Fixed streak persistence bug in processEndOfDay (no longer resets for new users or inactive days)
-- Made onboarding slides swipeable (right-to-left) on mobile
+- Revamped onboarding: 2 slides (down from 3) with fluid micro-animations — Slide 1 "Too many things" with floating chaos icons, Slide 2 "Just one thing" with OrganicCheck draw animation and breathing glow. Pulsing dots, breathing button. Swipeable.
 - Calendar view: disabled forward navigation beyond current month
 - Fixed day-detail bottom sheet: changed from formSheet to modal presentation for cross-platform compatibility
 - Added level upgrade/downgrade context info card in profile screen
