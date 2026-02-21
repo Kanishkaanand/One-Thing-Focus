@@ -3,8 +3,8 @@ import { Platform, Linking } from 'react-native';
 import { DailyEntry, UserProfile } from './storage';
 
 const PICK_TASK_ID = 'pick-task-reminder';
-const COMPLETE_TASK_ID = 'complete-task-reminder';
-const TASK_SCHEDULED_PREFIX = 'task-scheduled-';
+const WRAP_UP_ID = 'wrap-up-reminder';
+const FOCUS_NUDGE_PREFIX = 'focus-nudge-';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -17,30 +17,46 @@ Notifications.setNotificationHandler({
 });
 
 const pickTaskMessages = [
+  "Good morning, NAME. What's your one thing today?",
+  "New day, clean slate. What matters most today?",
+  "Just one thing. That's all. Whenever you're ready.",
+];
+
+const pickTaskMessagesNoName = [
   "Good morning! What's your one thing today?",
-  "A new day, a fresh start. Ready to pick your one thing?",
-  "Your day is wide open. What one thing will make it count?",
+  "New day, clean slate. What matters most today?",
+  "Just one thing. That's all. Whenever you're ready.",
 ];
 
-const pickTaskMessagesWithName = [
-  "Hey NAME, one task is all it takes. What will it be?",
+const focusNudgeMessages = [
+  "It's time. Your one thing: TASK",
+  "Now's the moment. TASK",
+  "NAME, you said TIME. Here it is. TASK",
 ];
 
-const completeTaskMessages = [
-  "Your one thing is waiting. You've got this.",
-  "Still time to finish today's task. Just one thing, remember?",
-  "Almost end of day — your task is still open. Wrap it up?",
+const focusNudgeMessagesNoName = [
+  "It's time. Your one thing: TASK",
+  "Now's the moment. TASK",
+  "Time to start: TASK",
 ];
 
-const completeTaskMessagesWithName = [
-  "Hey NAME, don't forget — you committed to one thing today.",
+const wrapUpMessages = [
+  "Still have your one thing open. There's still time.",
+  "Day's winding down. One thing left: TASK",
+  "No rush, but your task is waiting when you're ready.",
 ];
 
-function getRandomMessage(messages: string[], messagesWithName: string[], name?: string): string {
-  const allMessages = name
-    ? [...messages, ...messagesWithName.map(m => m.replace('NAME', name))]
-    : messages;
-  return allMessages[Math.floor(Math.random() * allMessages.length)];
+function pickRandom(arr: string[]): string {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function formatTime12h(time24: string): string {
+  const [hStr, mStr] = time24.split(':');
+  let h = parseInt(hStr, 10);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  if (h === 0) h = 12;
+  else if (h > 12) h -= 12;
+  return `${h}:${mStr} ${ampm}`;
 }
 
 export async function requestNotificationPermissions(): Promise<boolean> {
@@ -89,11 +105,16 @@ export async function schedulePickTaskReminder(
   const hour = parseInt(hourStr, 10);
   const minute = parseInt(minuteStr, 10);
 
+  if (hour >= 21) return;
+
+  const messages = name ? pickTaskMessages : pickTaskMessagesNoName;
+  const body = pickRandom(messages).replace('NAME', name || '');
+
   await Notifications.scheduleNotificationAsync({
     identifier: PICK_TASK_ID,
     content: {
       title: 'One Thing',
-      body: getRandomMessage(pickTaskMessages, pickTaskMessagesWithName, name),
+      body,
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
@@ -103,23 +124,79 @@ export async function schedulePickTaskReminder(
   });
 }
 
-export async function scheduleCompleteTaskReminder(
-  time: string,
+export async function scheduleFocusNudge(
+  taskId: string,
+  taskText: string,
+  scheduledTime: string,
   name?: string,
 ): Promise<void> {
   if (Platform.OS === 'web') return;
 
-  await cancelCompleteTaskReminder();
+  const { granted } = await getNotificationPermissionStatus();
+  if (!granted) return;
+
+  const identifier = `${FOCUS_NUDGE_PREFIX}${taskId}`;
+
+  try {
+    await Notifications.cancelScheduledNotificationAsync(identifier);
+  } catch {}
+
+  const [hourStr, minuteStr] = scheduledTime.split(':');
+  const hour = parseInt(hourStr, 10);
+  const minute = parseInt(minuteStr, 10);
+
+  if (hour >= 21) return;
+
+  const now = new Date();
+  const target = new Date();
+  target.setHours(hour, minute, 0, 0);
+
+  if (target.getTime() <= now.getTime()) return;
+
+  const secondsUntil = Math.floor((target.getTime() - now.getTime()) / 1000);
+
+  const messages = name ? focusNudgeMessages : focusNudgeMessagesNoName;
+  const body = pickRandom(messages)
+    .replace('TASK', taskText)
+    .replace('NAME', name || '')
+    .replace('TIME', formatTime12h(scheduledTime));
+
+  await Notifications.scheduleNotificationAsync({
+    identifier,
+    content: {
+      title: 'One Thing',
+      body,
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds: secondsUntil,
+      repeats: false,
+    },
+  });
+}
+
+export async function scheduleWrapUpReminder(
+  time: string,
+  taskText?: string,
+  name?: string,
+): Promise<void> {
+  if (Platform.OS === 'web') return;
+
+  await cancelWrapUpReminder();
 
   const [hourStr, minuteStr] = time.split(':');
   const hour = parseInt(hourStr, 10);
   const minute = parseInt(minuteStr, 10);
 
+  if (hour >= 21) return;
+
+  const body = pickRandom(wrapUpMessages).replace('TASK', taskText || 'your task');
+
   await Notifications.scheduleNotificationAsync({
-    identifier: COMPLETE_TASK_ID,
+    identifier: WRAP_UP_ID,
     content: {
       title: 'One Thing',
-      body: getRandomMessage(completeTaskMessages, completeTaskMessagesWithName, name),
+      body,
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
@@ -136,77 +213,42 @@ export async function cancelPickTaskReminder(): Promise<void> {
   } catch {}
 }
 
-export async function cancelCompleteTaskReminder(): Promise<void> {
+export async function cancelWrapUpReminder(): Promise<void> {
   if (Platform.OS === 'web') return;
   try {
-    await Notifications.cancelScheduledNotificationAsync(COMPLETE_TASK_ID);
+    await Notifications.cancelScheduledNotificationAsync(WRAP_UP_ID);
   } catch {}
 }
 
-export async function cancelAllReminders(): Promise<void> {
+export async function cancelFocusNudge(taskId: string): Promise<void> {
+  if (Platform.OS === 'web') return;
+  try {
+    await Notifications.cancelScheduledNotificationAsync(`${FOCUS_NUDGE_PREFIX}${taskId}`);
+  } catch {}
+}
+
+export async function cancelAllFocusNudges(tasks: { id: string }[]): Promise<void> {
+  if (Platform.OS === 'web') return;
+  for (const task of tasks) {
+    await cancelFocusNudge(task.id);
+  }
+}
+
+export async function cancelAllReminders(tasks?: { id: string }[]): Promise<void> {
   if (Platform.OS === 'web') return;
   await cancelPickTaskReminder();
-  await cancelCompleteTaskReminder();
+  await cancelWrapUpReminder();
+  if (tasks) {
+    await cancelAllFocusNudges(tasks);
+  }
 }
 
-const scheduledTaskMessages = [
-  "Time to tackle: TASK",
-  "Now's the time — TASK is waiting for you",
-  "You planned it, now own it: TASK",
-  "Your moment is here. Go do: TASK",
-  "Ready? It's time for: TASK",
-];
-
-export async function scheduleTaskTimeNotification(
-  taskId: string,
-  taskText: string,
-  scheduledTime: string,
-): Promise<void> {
-  if (Platform.OS === 'web') return;
-
-  const { granted } = await getNotificationPermissionStatus();
-  if (!granted) return;
-
-  const identifier = `${TASK_SCHEDULED_PREFIX}${taskId}`;
-
-  try {
-    await Notifications.cancelScheduledNotificationAsync(identifier);
-  } catch {}
-
-  const [hourStr, minuteStr] = scheduledTime.split(':');
-  const hour = parseInt(hourStr, 10);
-  const minute = parseInt(minuteStr, 10);
-
-  const now = new Date();
-  const target = new Date();
-  target.setHours(hour, minute, 0, 0);
-
-  if (target.getTime() <= now.getTime()) return;
-
-  const secondsUntil = Math.floor((target.getTime() - now.getTime()) / 1000);
-
-  const allMessages = scheduledTaskMessages.map(m => m.replace('TASK', taskText));
-  const body = allMessages[Math.floor(Math.random() * allMessages.length)];
-
-  await Notifications.scheduleNotificationAsync({
-    identifier,
-    content: {
-      title: 'One Thing',
-      body,
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-      seconds: secondsUntil,
-      repeats: false,
-    },
-  });
-}
-
-export async function cancelTaskTimeNotification(taskId: string): Promise<void> {
-  if (Platform.OS === 'web') return;
-  try {
-    await Notifications.cancelScheduledNotificationAsync(`${TASK_SCHEDULED_PREFIX}${taskId}`);
-  } catch {}
+function isWithinOneHour(time1: string, time2: string): boolean {
+  const [h1, m1] = time1.split(':').map(Number);
+  const [h2, m2] = time2.split(':').map(Number);
+  const mins1 = h1 * 60 + m1;
+  const mins2 = h2 * 60 + m2;
+  return Math.abs(mins1 - mins2) <= 60;
 }
 
 export async function syncNotifications(
@@ -219,30 +261,62 @@ export async function syncNotifications(
   if (!granted) return;
 
   const pickEnabled = profile.reminderPickTask.enabled;
-  const completeEnabled = profile.reminderCompleteTask.enabled;
+  const focusEnabled = profile.reminderFocusNudge.enabled;
+  const wrapUpEnabled = profile.reminderWrapUp.enabled;
+  const name = profile.name || undefined;
 
   if (!todayEntry || todayEntry.tasks.length === 0) {
     if (pickEnabled) {
-      await schedulePickTaskReminder(profile.reminderPickTask.time, profile.name || undefined);
+      await schedulePickTaskReminder(profile.reminderPickTask.time, name);
     } else {
       await cancelPickTaskReminder();
     }
-    await cancelCompleteTaskReminder();
+    await cancelWrapUpReminder();
     return;
   }
 
-  if (!todayEntry.completed) {
-    await cancelPickTaskReminder();
-    if (completeEnabled) {
-      await scheduleCompleteTaskReminder(profile.reminderCompleteTask.time, profile.name || undefined);
-    } else {
-      await cancelCompleteTaskReminder();
+  if (todayEntry.completed) {
+    await cancelAllReminders(todayEntry.tasks);
+    return;
+  }
+
+  await cancelPickTaskReminder();
+
+  const incompleteTasks = todayEntry.tasks.filter(t => !t.isCompleted);
+  const firstIncomplete = incompleteTasks[0];
+
+  if (focusEnabled) {
+    for (const task of todayEntry.tasks) {
+      if (task.isCompleted) {
+        await cancelFocusNudge(task.id);
+      } else if (task.scheduledTime) {
+        await scheduleFocusNudge(task.id, task.text, task.scheduledTime, name);
+      }
     }
-    return;
+  } else {
+    await cancelAllFocusNudges(todayEntry.tasks);
   }
 
-  await cancelAllReminders();
+  if (wrapUpEnabled && incompleteTasks.length > 0) {
+    const taskWithTime = incompleteTasks.find(t => t.scheduledTime);
+    const shouldSkipWrapUp = taskWithTime?.scheduledTime &&
+      isWithinOneHour(taskWithTime.scheduledTime, profile.reminderWrapUp.time);
+
+    if (!shouldSkipWrapUp) {
+      await scheduleWrapUpReminder(
+        profile.reminderWrapUp.time,
+        firstIncomplete?.text,
+        name,
+      );
+    } else {
+      await cancelWrapUpReminder();
+    }
+  } else {
+    await cancelWrapUpReminder();
+  }
 }
+
+export { cancelFocusNudge as cancelTaskTimeNotification };
 
 export async function rescheduleAllReminders(profile: UserProfile, todayEntry?: DailyEntry | null): Promise<void> {
   if (Platform.OS === 'web') return;
@@ -261,9 +335,9 @@ export async function rescheduleAllReminders(profile: UserProfile, todayEntry?: 
     await cancelPickTaskReminder();
   }
 
-  if (profile.reminderCompleteTask.enabled) {
-    await scheduleCompleteTaskReminder(profile.reminderCompleteTask.time, profile.name || undefined);
+  if (profile.reminderWrapUp.enabled) {
+    await scheduleWrapUpReminder(profile.reminderWrapUp.time);
   } else {
-    await cancelCompleteTaskReminder();
+    await cancelWrapUpReminder();
   }
 }
