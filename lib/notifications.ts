@@ -4,6 +4,7 @@ import { DailyEntry, UserProfile } from './storage';
 
 const PICK_TASK_ID = 'pick-task-reminder';
 const COMPLETE_TASK_ID = 'complete-task-reminder';
+const TASK_SCHEDULED_PREFIX = 'task-scheduled-';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -146,6 +147,66 @@ export async function cancelAllReminders(): Promise<void> {
   if (Platform.OS === 'web') return;
   await cancelPickTaskReminder();
   await cancelCompleteTaskReminder();
+}
+
+const scheduledTaskMessages = [
+  "Time to tackle: TASK",
+  "Now's the time — TASK is waiting for you",
+  "You planned it, now own it: TASK",
+  "Your moment is here. Go do: TASK",
+  "Ready? It's time for: TASK",
+];
+
+export async function scheduleTaskTimeNotification(
+  taskId: string,
+  taskText: string,
+  scheduledTime: string,
+): Promise<void> {
+  if (Platform.OS === 'web') return;
+
+  const { granted } = await getNotificationPermissionStatus();
+  if (!granted) return;
+
+  const identifier = `${TASK_SCHEDULED_PREFIX}${taskId}`;
+
+  try {
+    await Notifications.cancelScheduledNotificationAsync(identifier);
+  } catch {}
+
+  const [hourStr, minuteStr] = scheduledTime.split(':');
+  const hour = parseInt(hourStr, 10);
+  const minute = parseInt(minuteStr, 10);
+
+  const now = new Date();
+  const target = new Date();
+  target.setHours(hour, minute, 0, 0);
+
+  if (target.getTime() <= now.getTime()) return;
+
+  const secondsUntil = Math.floor((target.getTime() - now.getTime()) / 1000);
+
+  const allMessages = scheduledTaskMessages.map(m => m.replace('TASK', taskText));
+  const body = allMessages[Math.floor(Math.random() * allMessages.length)];
+
+  await Notifications.scheduleNotificationAsync({
+    identifier,
+    content: {
+      title: 'One Thing',
+      body,
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds: secondsUntil,
+      repeats: false,
+    },
+  });
+}
+
+export async function cancelTaskTimeNotification(taskId: string): Promise<void> {
+  if (Platform.OS === 'web') return;
+  try {
+    await Notifications.cancelScheduledNotificationAsync(`${TASK_SCHEDULED_PREFIX}${taskId}`);
+  } catch {}
 }
 
 export async function syncNotifications(

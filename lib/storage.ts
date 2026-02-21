@@ -29,6 +29,7 @@ export interface TaskItem {
   text: string;
   createdAt: string;
   completedAt?: string;
+  scheduledTime?: string;
   proof?: {
     type: 'photo' | 'screenshot' | 'document';
     uri: string;

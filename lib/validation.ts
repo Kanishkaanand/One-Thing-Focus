@@ -33,6 +33,7 @@ export const TaskItemSchema = z.object({
   text: z.string().min(1),
   createdAt: z.string(),
   completedAt: z.string().optional(),
+  scheduledTime: z.string().optional(),
   proof: TaskProofSchema.optional(),
   isCompleted: z.boolean(),
 });

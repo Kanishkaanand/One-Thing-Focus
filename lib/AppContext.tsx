@@ -18,7 +18,7 @@ import {
 import { createLogger } from './errorReporting';
 
 const logger = createLogger('AppContext');
-import { syncNotifications, rescheduleAllReminders } from './notifications';
+import { syncNotifications, rescheduleAllReminders, cancelTaskTimeNotification } from './notifications';
 import { validateTaskInput, validateNoteInput, validateMood, type MoodType } from './validation';
 import { syncWidgetData } from './widgetData';
 import {
@@ -177,6 +177,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const allDone = updatedTasks.every(t => t.isCompleted);
     const completedCount = updatedTasks.filter(t => t.isCompleted).length;
+
+    cancelTaskTimeNotification(taskId);
 
     // Track task completion
     trackTaskCompleted(!!proof, proof?.type);

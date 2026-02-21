@@ -51,12 +51,24 @@ import {
   ProofSheet,
   ReflectionModal,
   ProofViewModal,
+  TimePickerModal,
   type ProofOption,
   type MoodType,
 } from '@/components/modals';
+import { scheduleTaskTimeNotification, cancelTaskTimeNotification } from '@/lib/notifications';
 import StorageWarningBanner from '@/components/StorageWarningBanner';
 
 const logger = createLogger('HomeScreen');
+
+function formatTime12hDisplay(time24: string): string {
+  const [hStr, mStr] = time24.split(':');
+  let h = parseInt(hStr, 10);
+  const m = mStr;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  if (h === 0) h = 12;
+  else if (h > 12) h -= 12;
+  return `${h}:${m} ${ampm}`;
+}
 
 const GENERIC_MESSAGES = [
   "Done and dusted. The rest of the day is yours.",
@@ -228,9 +240,19 @@ const ActiveTaskCard = memo(function ActiveTaskCard({
             <View style={[styles.checkbox, task.isCompleted && styles.checkboxCompleted]}>
               {task.isCompleted && <Feather name="check" size={14} color="#FFF" />}
             </View>
-            <Text style={[styles.taskText, task.isCompleted && styles.taskTextCompleted]}>
-              {task.text}
-            </Text>
+            <View style={styles.taskTextWrap}>
+              <Text style={[styles.taskText, task.isCompleted && styles.taskTextCompleted]}>
+                {task.text}
+              </Text>
+              {task.scheduledTime && !task.isCompleted && (
+                <View style={styles.scheduledTimeTag}>
+                  <Feather name="clock" size={11} color={Colors.accent} />
+                  <Text style={styles.scheduledTimeText}>
+                    {formatTime12hDisplay(task.scheduledTime)}
+                  </Text>
+                </View>
+              )}
+            </View>
           </View>
           {task.proof && (
             <View
@@ -441,6 +463,7 @@ export default function HomeScreen() {
     completeTask,
     addReflection,
     canAddMoreTasks,
+    refreshData,
     yesterdayMissed,
     justLeveledUp,
     setJustLeveledUp,
@@ -463,6 +486,8 @@ export default function HomeScreen() {
   const [playAnimation, setPlayAnimation] = useState(false);
   const [proofToast, setProofToast] = useState(false);
   const [showWidgetTip, setShowWidgetTip] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [pendingTaskName, setPendingTaskName] = useState('');
   const justCompletedRef = useRef(false);
   const pendingCelebrationRef = useRef(false);
 
@@ -545,12 +570,36 @@ export default function HomeScreen() {
     if (!taskInput.trim()) return;
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      await addTask(taskInput.trim());
+      const trimmed = taskInput.trim();
+      await addTask(trimmed);
+      setPendingTaskName(trimmed);
       setTaskInput('');
       setShowInput(false);
+      setShowTimePicker(true);
     } catch (e) {
       logger.error(e instanceof Error ? e : new Error(String(e)), 'addTask');
     }
+  };
+
+  const handleSetTaskTime = async (time: string) => {
+    setShowTimePicker(false);
+    if (!todayEntry) return;
+    const lastTask = todayEntry.tasks[todayEntry.tasks.length - 1];
+    if (!lastTask) return;
+
+    const updatedTasks = todayEntry.tasks.map(t =>
+      t.id === lastTask.id ? { ...t, scheduledTime: time } : t
+    );
+    const updated: DailyEntry = { ...todayEntry, tasks: updatedTasks };
+    await saveEntry(updated);
+    await refreshData();
+
+    await scheduleTaskTimeNotification(lastTask.id, lastTask.text, time);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const handleSkipTimePicker = () => {
+    setShowTimePicker(false);
   };
 
   const handleCompleteTask = (taskId: string) => {
@@ -887,6 +936,13 @@ export default function HomeScreen() {
         onClose={() => setShowInput(false)}
       />
 
+      <TimePickerModal
+        visible={showTimePicker}
+        taskName={pendingTaskName}
+        onSetTime={handleSetTaskTime}
+        onSkip={handleSkipTimePicker}
+      />
+
       <ProofSheet
         visible={showProofSheet}
         onSelect={handleProofOption}
@@ -1090,15 +1146,28 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.success,
     borderColor: Colors.success,
   },
+  taskTextWrap: {
+    flex: 1,
+    gap: 4,
+  },
   taskText: {
     fontFamily: 'DMSans_500Medium',
     fontSize: 16,
     color: Colors.textPrimary,
-    flex: 1,
   },
   taskTextCompleted: {
     color: Colors.textSecondary,
     textDecorationLine: 'line-through',
+  },
+  scheduledTimeTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  scheduledTimeText: {
+    fontFamily: 'DMSans_400Regular',
+    fontSize: 12,
+    color: Colors.accent,
   },
   proofBadge: {
     width: 28,
