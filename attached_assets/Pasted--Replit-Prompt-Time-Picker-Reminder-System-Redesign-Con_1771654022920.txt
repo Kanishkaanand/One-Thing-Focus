@@ -1,0 +1,158 @@
+# Replit Prompt — Time Picker & Reminder System Redesign
+
+## Context
+
+This is the "Just Today" app — a minimalist daily task commitment app. We're adding a time picker to the task creation flow so users can set when they want to be reminded to work on their task. This also requires redesigning the notification system from 2 reminders to 3.
+
+## What to Build
+
+### 1. Time Picker on Task Creation
+
+After the user types their task text and before they tap "Add your task", show a lightweight time picker section. It should feel casual, not like scheduling a calendar event.
+
+**Layout:** The time picker appears inside the task input card, below the text input, separated by a subtle divider line. It slides in with a gentle fade animation after the user starts typing. If the input is empty, the time picker is hidden.
+
+**Label:** "Remind me at..." in secondary text (#8A8580) above the pills.
+
+**Four pill buttons in a row:**
+
+- ☀️ Morning → maps to 9:00 AM
+- 🌤 Afternoon → maps to 2:00 PM  
+- 🌙 Evening → maps to 6:00 PM
+- ⏰ Custom → opens a time picker wheel (use the native iOS/Android time picker as a bottom sheet)
+
+**Pill styling:**
+- Default: cream background (#FAF7F2), subtle border (#D9D4CE), text in warm gray (#8A8580)
+- Selected: amber fill (#E8913A), white text, slight scale-up animation
+- Border radius: 20px (fully rounded pill shape)
+- Gap between pills: 8px
+
+**When a pill is selected**, show a confirmation line below:
+- "🔔 We'll remind you at 2:00 PM" in sage green (#7DB07A)
+- Small × button on the right to clear the selection
+- This line fades in gently
+
+**When Custom is tapped**, the native time picker opens. Once user picks a time, the Custom pill stays selected and the confirmation shows their chosen time.
+
+**The entire time picker section is optional.** If the user ignores it and taps "Add your task", no focus reminder is scheduled. No validation errors, no prompts. Just silently skip it.
+
+### 2. Data Model Changes
+
+Add to TaskItem interface:
+
+```typescript
+interface TaskItem {
+  // ...existing fields
+  scheduledTime?: string;  // "14:00" format, optional
+}
+```
+
+Update UserProfile reminder settings:
+
+```typescript
+interface UserProfile {
+  // replace existing reminder fields with:
+  reminderPickTask: { enabled: boolean; time: string };     // default 8:00 AM
+  reminderFocusNudge: { enabled: boolean };                  // no global time, per-task
+  reminderWrapUp: { enabled: boolean; time: string };        // default 7:00 PM
+}
+```
+
+### 3. Three Notification Types
+
+Redesign the notification system from 2 reminders to 3:
+
+**"Pick your task" (morning nudge)**
+- Fires at user's chosen time (default 8:00 AM)
+- Condition: only if no task created for today
+- Auto-cancels: the moment a task is created
+- Rotating copy:
+  - "Good morning, {name}. What's your one thing today?"
+  - "New day, clean slate. What matters most today?"
+  - "Just one thing. That's all. Whenever you're ready."
+
+**"Time to start" (focus nudge) — NEW**
+- Fires at the exact time the user chose via the pill/custom picker
+- Condition: task exists but not yet completed
+- Auto-cancels: if task completed before this time
+- Only scheduled if user actually set a time during task creation
+- Copy:
+  - "It's time. Your one thing: {task text}"
+  - "Now's the moment. {task text}"
+  - "{name}, you said 2pm. Here it is. {task text}"
+
+**"Wrap up" (evening nudge)**
+- Fires at user's chosen time (default 7:00 PM)
+- Condition: task exists but not yet completed
+- Auto-cancels: if all tasks completed
+- Copy:
+  - "Still have your one thing open. There's still time."
+  - "Day's winding down. One thing left: {task text}"
+  - "No rush, but your task is waiting when you're ready."
+
+**Smart rules to prevent spam:**
+- Never send more than 2 notifications in a single day
+- If user sets a task time within 1 hour of their wrap-up time, skip the wrap-up
+- If all tasks completed, cancel all remaining notifications
+- Never send notifications after 9:00 PM regardless of settings
+
+### 4. Settings Screen Update
+
+Update the Profile screen reminders section from 2 toggles to 3:
+
+```
+REMINDERS
+
+Pick your task        [toggle]  [time: 8:00 AM]
+Focus reminder        [toggle]
+Wrap up               [toggle]  [time: 7:00 PM]
+```
+
+The Focus reminder toggle is a master switch:
+- When ON: the time picker pills appear in the task creation flow
+- When OFF: the time picker section is completely hidden during task creation, and no focus nudge notifications are ever scheduled
+
+Pick your task and Wrap up keep their existing toggle + time picker format.
+
+### 5. Onboarding Update
+
+Update the notification setup onboarding screen to show 3 reminders instead of 2:
+
+```
+Pick your task          ⏰ 8:00 AM
+Focus reminder          ✓ Enabled
+Wrap up                 ⏰ 7:00 PM
+```
+
+Keep the same warm, friendly copy: "We'll send you three quiet nudges each day — one to pick your task, one when it's time to start, and one to wrap up."
+
+### 6. Notification Scheduling Logic
+
+Update `/lib/notifications.ts`:
+
+When a task is created WITH a scheduled time:
+1. Cancel "Pick your task" notification (task exists now)
+2. Schedule "Time to start" at the chosen time
+3. Keep "Wrap up" scheduled unless the task time is within 1 hour of wrap-up time
+
+When a task is created WITHOUT a scheduled time:
+1. Cancel "Pick your task" notification
+2. No "Time to start" scheduled
+3. Keep "Wrap up" scheduled as normal
+
+When a task is completed:
+1. Cancel "Time to start" if it hasn't fired yet
+2. Cancel "Wrap up"
+3. No more notifications for the day
+
+When the day rolls over (midnight):
+1. Reset all notification schedules based on user settings
+2. Schedule "Pick your task" for the next morning
+
+## Design Rules
+
+- The time picker must match the app's warm minimalism aesthetic
+- Use the existing color palette: cream (#FAF7F2), amber (#E8913A), sage (#7DB07A), charcoal (#2D2A26), warm gray (#8A8580), stone (#D9D4CE)
+- Animations should be gentle: fade-ins, subtle slide-ups, soft spring on pill selection
+- The time picker should never feel like a form or a calendar scheduling interface
+- Keep it lightweight and skippable — zero friction if the user doesn't want to set a time

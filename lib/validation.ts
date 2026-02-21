@@ -9,6 +9,10 @@ export const ReminderConfigSchema = z.object({
   time: z.string(),
 });
 
+export const FocusNudgeConfigSchema = z.object({
+  enabled: z.boolean(),
+});
+
 export const UserProfileSchema = z.object({
   name: z.string(),
   createdAt: z.string(),
@@ -20,7 +24,8 @@ export const UserProfileSchema = z.object({
   reminderTime: z.string(),
   onboardingComplete: z.boolean(),
   reminderPickTask: ReminderConfigSchema,
-  reminderCompleteTask: ReminderConfigSchema,
+  reminderFocusNudge: FocusNudgeConfigSchema,
+  reminderWrapUp: ReminderConfigSchema,
 });
 
 export const TaskProofSchema = z.object({

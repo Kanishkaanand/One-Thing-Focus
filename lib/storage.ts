@@ -10,6 +10,10 @@ export interface ReminderConfig {
   time: string;
 }
 
+export interface FocusNudgeConfig {
+  enabled: boolean;
+}
+
 export interface UserProfile {
   name: string;
   createdAt: string;
@@ -21,7 +25,8 @@ export interface UserProfile {
   reminderTime: string;
   onboardingComplete: boolean;
   reminderPickTask: ReminderConfig;
-  reminderCompleteTask: ReminderConfig;
+  reminderFocusNudge: FocusNudgeConfig;
+  reminderWrapUp: ReminderConfig;
 }
 
 export interface TaskItem {
@@ -72,9 +77,12 @@ const defaultProfile: UserProfile = {
     enabled: false,
     time: '08:00',
   },
-  reminderCompleteTask: {
+  reminderFocusNudge: {
     enabled: false,
-    time: '18:00',
+  },
+  reminderWrapUp: {
+    enabled: false,
+    time: '19:00',
   },
 };
 
@@ -95,7 +103,15 @@ export async function getProfile(): Promise<UserProfile> {
     // Merge with defaults first to ensure all fields exist
     const parsedObj = typeof parsed === 'object' && parsed !== null ? parsed as Record<string, unknown> : {};
     const reminderPick = parsedObj.reminderPickTask;
-    const reminderComplete = parsedObj.reminderCompleteTask;
+    const reminderFocus = parsedObj.reminderFocusNudge;
+    const reminderWrap = parsedObj.reminderWrapUp;
+
+    const oldComplete = parsedObj.reminderCompleteTask;
+    const migratedWrapUp = typeof reminderWrap === 'object' && reminderWrap !== null
+      ? reminderWrap as Record<string, unknown>
+      : typeof oldComplete === 'object' && oldComplete !== null
+        ? oldComplete as Record<string, unknown>
+        : {};
 
     const merged = {
       ...defaultProfile,
@@ -104,9 +120,13 @@ export async function getProfile(): Promise<UserProfile> {
         ...defaultProfile.reminderPickTask,
         ...(typeof reminderPick === 'object' && reminderPick !== null ? reminderPick as Record<string, unknown> : {}),
       },
-      reminderCompleteTask: {
-        ...defaultProfile.reminderCompleteTask,
-        ...(typeof reminderComplete === 'object' && reminderComplete !== null ? reminderComplete as Record<string, unknown> : {}),
+      reminderFocusNudge: {
+        ...defaultProfile.reminderFocusNudge,
+        ...(typeof reminderFocus === 'object' && reminderFocus !== null ? reminderFocus as Record<string, unknown> : {}),
+      },
+      reminderWrapUp: {
+        ...defaultProfile.reminderWrapUp,
+        ...migratedWrapUp,
       },
     };
 
