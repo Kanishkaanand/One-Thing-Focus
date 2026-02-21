@@ -73,7 +73,10 @@ widgets/
 
 ## Recent Changes
 - Initial build: Full app implementation with onboarding, home, calendar, profile screens
-- Added dual-reminder notification system with state-aware scheduling
+- Redesigned 3-reminder notification system: Pick Task (morning), Focus Nudge (auto 2hrs after task creation), Wrap Up (evening) with anti-spam logic
+- TaskInputModal has inline time picker pills (Morning/Afternoon/Evening/Custom) for scheduling focus nudges
+- Profile shows 3 reminder toggles; Focus Nudge shows "Auto" timing indicator
+- Data model: reminderFocusNudge: { enabled }, reminderWrapUp: { enabled, time } (replaced old reminderCompleteTask)
 - Added completed state (State C) for home screen with animated checkmark, contextual completion messages, journal-style reflection, and "See you tomorrow" footer
 - Enhanced celebration overlay: floating emoji particles, bounce animation, streak badge, bigger icon with emoji
 - Added emojis to footer: moon emoji, "Rest up, you earned it" sparkle subtext
