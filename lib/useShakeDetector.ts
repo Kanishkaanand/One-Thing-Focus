@@ -8,6 +8,7 @@ interface ShakeDetectorOptions {
   requiredShakeCount?: number;
   timeWindow?: number;
   cooldown?: number;
+  enabled?: boolean;
 }
 
 export function useShakeDetector({
@@ -16,6 +17,7 @@ export function useShakeDetector({
   requiredShakeCount = 3,
   timeWindow = 1000,
   cooldown = 2000,
+  enabled = true,
 }: ShakeDetectorOptions): void {
   const shakeTimestamps = useRef<number[]>([]);
   const lastShakeFired = useRef(0);
@@ -27,6 +29,7 @@ export function useShakeDetector({
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
+    if (!enabled) return;
 
     Accelerometer.setUpdateInterval(100);
 
@@ -53,5 +56,5 @@ export function useShakeDetector({
     return () => {
       subscription.remove();
     };
-  }, [threshold, requiredShakeCount, timeWindow, cooldown]);
+  }, [threshold, requiredShakeCount, timeWindow, cooldown, enabled]);
 }

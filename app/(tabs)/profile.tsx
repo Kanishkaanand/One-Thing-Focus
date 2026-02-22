@@ -13,6 +13,7 @@ import {
   Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
@@ -139,6 +140,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile, todayEntry, entries, updateProfile, resetAllData, isLoading } = useApp();
+  const isFocused = useIsFocused();
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -148,12 +150,13 @@ export default function ProfileScreen() {
   // Track screen views
   useScreenAnalytics('Profile');
 
-  // Shake gesture triggers hidden reset flow
+  // Shake gesture triggers hidden reset flow (only when Profile tab is focused)
   useShakeDetector({
     onShake: () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       setShowResetConfirm(true);
     },
+    enabled: isFocused,
   });
 
   useEffect(() => {
