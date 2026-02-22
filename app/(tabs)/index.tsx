@@ -878,12 +878,12 @@ export default function HomeScreen() {
               style={({ pressed }) => [styles.addButton, pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] }]}
               onPress={() => setShowInput(true)}
               accessible={true}
-              accessibilityLabel="Add your task"
+              accessibilityLabel="Pick your one thing"
               accessibilityRole="button"
               accessibilityHint="Opens a dialog to enter your task for today"
             >
               <Feather name="plus" size={20} color="#FFF" />
-              <Text style={styles.addButtonText}>Add your task</Text>
+              <Text style={styles.addButtonText}>Pick your one thing</Text>
             </Pressable>
           </Animated.View>
         )}
