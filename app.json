@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.kanishkaanand.onethingfocus",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "infoPlist": {
         "NSUserNotificationUsageDescription": "One Thing uses notifications to remind you to pick and complete your daily task.",
         "NSPhotoLibraryUsageDescription": "One Thing lets you attach a photo as proof of task completion."
