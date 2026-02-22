@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.kanishkaanand.onethingfocus",
-      "buildNumber": "4",
+      "buildNumber": "5",
       "infoPlist": {
         "NSUserNotificationUsageDescription": "One Thing uses notifications to remind you to pick and complete your daily task.",
         "NSPhotoLibraryUsageDescription": "One Thing lets you attach a photo as proof of task completion.",
@@ -24,9 +24,6 @@
         "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
-        "com.apple.security.application-groups": [
-          "group.com.kanishkaanand.onethingfocus.expowidgets"
-        ],
         "aps-environment": "production"
       }
     },
@@ -66,34 +63,7 @@
         }
       ],
       "expo-font",
-      "expo-web-browser",
-      [
-        "@bittingz/expo-widgets",
-        {
-          "ios": {
-            "src": "./widgets/ios",
-            "devTeamId": "78UCPHZ54V",
-            "mode": "production",
-            "moduleDependencies": [],
-            "useLiveActivities": false,
-            "frequentUpdates": false,
-            "entitlements": {
-              "com.apple.security.application-groups": [
-                "group.com.kanishkaanand.onethingfocus"
-              ]
-            }
-          },
-          "android": {
-            "src": "./widgets/android",
-            "widgets": [
-              {
-                "name": "OneThingWidgetProvider",
-                "resourceName": "@xml/one_thing_widget_info"
-              }
-            ]
-          }
-        }
-      ]
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
