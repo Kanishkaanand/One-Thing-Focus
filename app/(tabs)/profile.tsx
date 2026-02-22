@@ -38,6 +38,8 @@ const PRIVACY_POLICY_URL =
 const TERMS_URL =
   process.env.EXPO_PUBLIC_TERMS_URL ||
   'https://github.com/Kanishkaanand/One-Thing-Focus/blob/main/docs/TERMS_OF_USE.md';
+const APP_STORE_URL =
+  'https://apps.apple.com/app/id6759150671?action=write-review';
 
 function StatCard({ icon, label, value, delay }: { icon: string; label: string; value: string | number; delay: number }) {
   return (
@@ -353,6 +355,16 @@ export default function ProfileScreen() {
             <View style={styles.settingLeft}>
               <Feather name="file-text" size={18} color={Colors.textSecondary} />
               <Text style={styles.settingText}>Terms of Use</Text>
+            </View>
+            <Feather name="external-link" size={16} color={Colors.neutral} />
+          </Pressable>
+          <Pressable
+            style={styles.legalRow}
+            onPress={() => openExternalUrl(APP_STORE_URL, 'App Store')}
+          >
+            <View style={styles.settingLeft}>
+              <Feather name="star" size={18} color={Colors.textSecondary} />
+              <Text style={styles.settingText}>Rate on App Store</Text>
             </View>
             <Feather name="external-link" size={16} color={Colors.neutral} />
           </Pressable>
