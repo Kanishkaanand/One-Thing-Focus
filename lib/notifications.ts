@@ -109,11 +109,13 @@ export async function openNotificationSettings(): Promise<void> {
   }
 }
 
+export type ScheduleStatus = 'scheduled' | 'past' | 'after-9pm' | 'no-permission' | 'web';
+
 export async function schedulePickTaskReminder(
   time: string,
   name?: string,
-): Promise<void> {
-  if (Platform.OS === 'web') return;
+): Promise<ScheduleStatus> {
+  if (Platform.OS === 'web') return 'web';
 
   await cancelPickTaskReminder();
 
@@ -121,7 +123,7 @@ export async function schedulePickTaskReminder(
   const hour = parseInt(hourStr, 10);
   const minute = parseInt(minuteStr, 10);
 
-  if (hour >= 21) return;
+  if (hour >= 21) return 'after-9pm';
 
   const messages = name ? pickTaskMessages : pickTaskMessagesNoName;
   const body = pickRandom(messages).replace('NAME', name || '');
@@ -138,6 +140,8 @@ export async function schedulePickTaskReminder(
       minute,
     },
   });
+
+  return 'scheduled';
 }
 
 export async function scheduleTaskNudge(
@@ -146,11 +150,11 @@ export async function scheduleTaskNudge(
   scheduledTime: string | undefined,
   taskCreatedAt: string,
   name?: string,
-): Promise<void> {
-  if (Platform.OS === 'web') return;
+): Promise<ScheduleStatus> {
+  if (Platform.OS === 'web') return 'web';
 
   const { granted } = await getNotificationPermissionStatus();
-  if (!granted) return;
+  if (!granted) return 'no-permission';
 
   const nudgeId = `${TASK_NUDGE_PREFIX}${taskId}`;
   const wrapUpId = `${WRAP_UP_PREFIX}${taskId}`;
@@ -168,14 +172,12 @@ export async function scheduleTaskNudge(
     nudgeTime = new Date();
     nudgeTime.setHours(parseInt(hourStr, 10), parseInt(minuteStr, 10), 0, 0);
 
-    if (nudgeTime.getTime() <= now.getTime()) return;
+    if (nudgeTime.getTime() <= now.getTime()) return 'past';
   } else {
     nudgeTime = new Date(new Date(taskCreatedAt).getTime() + 2 * 60 * 60 * 1000);
 
-    if (nudgeTime.getTime() <= now.getTime()) return;
+    if (nudgeTime.getTime() <= now.getTime()) return 'past';
   }
-
-  if (isAfter9PM(nudgeTime)) return;
 
   const secondsUntilNudge = Math.floor((nudgeTime.getTime() - now.getTime()) / 1000);
 
@@ -228,6 +230,8 @@ export async function scheduleTaskNudge(
       });
     }
   }
+
+  return 'scheduled';
 }
 
 export async function cancelPickTaskReminder(): Promise<void> {

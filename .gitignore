@@ -11,6 +11,7 @@ expo-env.d.ts
 
 # Native
 ios/
+!widgets/ios/
 android/
 *.orig.*
 *.jks

@@ -24,7 +24,10 @@
         "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
-        "aps-environment": "production"
+        "aps-environment": "production",
+        "com.apple.security.application-groups": [
+          "group.com.kanishkaanand.onethingfocus"
+        ]
       }
     },
     "android": {
@@ -63,7 +66,28 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "@bittingz/expo-widgets",
+        {
+          "ios": {
+            "src": "./widgets/ios",
+            "devTeamId": "78UCPHZ54V",
+            "mode": "production",
+            "moduleDependencies": [],
+            "useLiveActivities": false,
+            "frequentUpdates": false,
+            "xcode": {
+              "appGroupId": "group.com.kanishkaanand.onethingfocus"
+            },
+            "entitlements": {
+              "com.apple.security.application-groups": [
+                "group.com.kanishkaanand.onethingfocus"
+              ]
+            }
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

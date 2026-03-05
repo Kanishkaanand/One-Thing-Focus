@@ -1,4 +1,4 @@
-import React, { memo, useState, useCallback } from 'react';
+import React, { memo, useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -31,8 +31,26 @@ const TIME_PRESETS: { key: TimePillOption; label: string; icon: string; time: st
   { key: 'evening', label: 'Evening', icon: 'sunset', time: '17:00' },
 ];
 
+function isTimePast(time: string): boolean {
+  const [h, m] = time.split(':').map(Number);
+  const now = new Date();
+  return h < now.getHours() || (h === now.getHours() && m <= now.getMinutes());
+}
+
+function isCustomTimePast(hour: number, minute: number): boolean {
+  const now = new Date();
+  return hour < now.getHours() || (hour === now.getHours() && minute <= now.getMinutes());
+}
+
 function getCustomHours(): number[] {
-  return Array.from({ length: 15 }, (_, i) => i + 7);
+  const now = new Date();
+  const currentHour = now.getHours();
+  // If past :45 of the current hour, no valid 15-min slot remains — start from next hour
+  const earliest = now.getMinutes() >= 45 ? currentHour + 1 : currentHour;
+  const start = Math.max(earliest, 7);
+  const end = 23;
+  if (start > end) return [];
+  return Array.from({ length: end - start + 1 }, (_, i) => i + start);
 }
 
 function formatTime12h(hour: number, minute: number): string {
@@ -64,14 +82,28 @@ function TaskInputModal({
   const isSubmitDisabled = !value.trim();
 
   const [selectedPill, setSelectedPill] = useState<TimePillOption>(null);
-  const [customHour, setCustomHour] = useState(10);
+  const [customHour, setCustomHour] = useState(() => {
+    const hours = getCustomHours();
+    return hours.length > 0 ? hours[0] : 21;
+  });
   const [customMinute, setCustomMinute] = useState(0);
   const [showCustomPicker, setShowCustomPicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
 
+  // When the selected hour is the current hour, snap minute forward if it's now in the past
+  useEffect(() => {
+    const currentHour = new Date().getHours();
+    const currentMinute = new Date().getMinutes();
+    if (customHour === currentHour && customMinute <= currentMinute) {
+      const nextValid = [0, 15, 30, 45].find((m) => m > currentMinute);
+      setCustomMinute(nextValid ?? 0);
+    }
+  }, [customHour]);
+
   const resetState = useCallback(() => {
     setSelectedPill(null);
-    setCustomHour(10);
+    const hours = getCustomHours();
+    setCustomHour(hours.length > 0 ? hours[0] : 21);
     setCustomMinute(0);
     setShowCustomPicker(false);
     setShowTimePicker(false);
@@ -98,6 +130,7 @@ function TaskInputModal({
 
   const handleSubmit = () => {
     if (isSubmitDisabled) return;
+    if (selectedPill && isSelectedTimePast) return;
     const scheduledTime = getScheduledTime();
     onSubmit(scheduledTime);
     resetState();
@@ -129,7 +162,21 @@ function TaskInputModal({
       : formatPresetLabel(selectedPill)
     : null;
 
-  const minutes = [0, 15, 30, 45];
+  const selectedTimeHour = selectedPill === 'custom'
+    ? customHour
+    : selectedPill ? parseInt(TIME_PRESETS.find(p => p.key === selectedPill)?.time?.split(':')[0] || '0', 10) : 0;
+
+  const isSelectedTimePast = selectedPill
+    ? selectedPill === 'custom'
+      ? isCustomTimePast(customHour, customMinute)
+      : isTimePast(TIME_PRESETS.find(p => p.key === selectedPill)?.time || '00:00')
+    : false;
+
+  const allMinutes = [0, 15, 30, 45];
+  const now = new Date();
+  const minutes = customHour === now.getHours()
+    ? allMinutes.filter((m) => m > now.getMinutes())
+    : allMinutes;
 
   return (
     <Modal visible={visible} transparent animationType="fade">
@@ -179,17 +226,19 @@ function TaskInputModal({
             </Pressable>
           </View>
 
-          {selectedPill && confirmationTimeLabel ? (
-            <Animated.View entering={FadeIn.duration(200)} style={styles.timeConfirmRow}>
-              <View style={styles.timeConfirmLeft}>
-                <Feather name="bell" size={13} color={Colors.accent} />
-                <Text style={styles.timeConfirmText}>
-                  Nudge at {confirmationTimeLabel}
-                </Text>
+          {selectedPill && confirmationTimeLabel && !showCustomPicker ? (
+            <Animated.View entering={FadeIn.duration(200)}>
+              <View style={styles.timeConfirmRow}>
+                <View style={styles.timeConfirmLeft}>
+                  <Feather name="bell" size={13} color={isSelectedTimePast ? '#D97706' : Colors.accent} />
+                  <Text style={[styles.timeConfirmText, isSelectedTimePast && styles.timeWarningText]}>
+                    {isSelectedTimePast ? 'Time has already passed' : `Nudge at ${confirmationTimeLabel}`}
+                  </Text>
+                </View>
+                <Pressable onPress={handleClearTime} style={styles.timeChangeBtn}>
+                  <Text style={styles.timeChangeBtnText}>Change</Text>
+                </Pressable>
               </View>
-              <Pressable onPress={handleClearTime} style={styles.timeChangeBtn}>
-                <Text style={styles.timeChangeBtnText}>Change</Text>
-              </Pressable>
             </Animated.View>
           ) : !showTimePicker ? (
             <Animated.View entering={FadeIn.duration(200)} style={styles.timePromptRow}>
@@ -215,28 +264,34 @@ function TaskInputModal({
               </View>
 
               <View style={styles.pillRow}>
-                {TIME_PRESETS.map((preset) => (
-                  <Pressable
-                    key={preset.key}
-                    style={[
-                      styles.pill,
-                      selectedPill === preset.key && styles.pillSelected,
-                    ]}
-                    onPress={() => handlePillPress(preset.key)}
-                  >
-                    <Feather
-                      name={preset.icon as any}
-                      size={14}
-                      color={selectedPill === preset.key ? Colors.accent : Colors.textSecondary}
-                    />
-                    <Text style={[
-                      styles.pillText,
-                      selectedPill === preset.key && styles.pillTextSelected,
-                    ]}>
-                      {preset.label}
-                    </Text>
-                  </Pressable>
-                ))}
+                {TIME_PRESETS.map((preset) => {
+                  const past = isTimePast(preset.time);
+                  return (
+                    <Pressable
+                      key={preset.key}
+                      style={[
+                        styles.pill,
+                        selectedPill === preset.key && styles.pillSelected,
+                        past && styles.pillDisabled,
+                      ]}
+                      onPress={() => !past && handlePillPress(preset.key)}
+                      disabled={past}
+                    >
+                      <Feather
+                        name={preset.icon as any}
+                        size={14}
+                        color={past ? Colors.neutral : selectedPill === preset.key ? Colors.accent : Colors.textSecondary}
+                      />
+                      <Text style={[
+                        styles.pillText,
+                        selectedPill === preset.key && styles.pillTextSelected,
+                        past && styles.pillTextDisabled,
+                      ]}>
+                        {preset.label}{past ? ' (past)' : ''}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
                 <Pressable
                   style={[
                     styles.pill,
@@ -536,13 +591,22 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accentLight,
   },
   customOptionText: {
-    fontFamily: 'DMSans_400Regular',
-    fontSize: 14,
-    color: Colors.textSecondary,
+    fontFamily: 'DMSans_500Medium',
+    fontSize: 16,
+    color: Colors.textPrimary,
   },
   customOptionTextSelected: {
     fontFamily: 'DMSans_600SemiBold',
     color: Colors.accent,
+  },
+  pillDisabled: {
+    opacity: 0.4,
+  },
+  pillTextDisabled: {
+    color: Colors.neutral,
+  },
+  timeWarningText: {
+    color: '#D97706',
   },
 });
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -31,8 +31,30 @@ import { useScreenAnalytics } from '@/lib/useAnalytics';
 import { trackReminderToggled } from '@/lib/analytics';
 import { useShakeDetector } from '@/lib/useShakeDetector';
 
-const HOURS = Array.from({ length: 24 }, (_, i) => i);
-const MINUTES = [0, 15, 30, 45];
+type TimePillOption = 'morning' | 'afternoon' | 'evening' | 'custom' | null;
+
+const TIME_PRESETS: { key: TimePillOption; label: string; icon: string; time: string }[] = [
+  { key: 'morning', label: 'Morning', icon: 'sunrise', time: '09:00' },
+  { key: 'afternoon', label: 'Afternoon', icon: 'sun', time: '13:00' },
+  { key: 'evening', label: 'Evening', icon: 'sunset', time: '17:00' },
+];
+
+function getAvailableHours(): number[] {
+  const now = new Date();
+  const currentHour = now.getHours();
+  const earliest = now.getMinutes() >= 45 ? currentHour + 1 : currentHour;
+  const start = Math.max(earliest, 7);
+  const end = 23;
+  if (start > end) return [];
+  return Array.from({ length: end - start + 1 }, (_, i) => i + start);
+}
+
+function isPresetPast(time: string): boolean {
+  const [h, m] = time.split(':').map(Number);
+  const now = new Date();
+  return h < now.getHours() || (h === now.getHours() && m <= now.getMinutes());
+}
+
 const PRIVACY_POLICY_URL =
   process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ||
   'https://github.com/Kanishkaanand/One-Thing-Focus/blob/main/docs/PRIVACY_POLICY.md';
@@ -65,21 +87,73 @@ function TimePicker({
   onClose: () => void;
   onSelect: (time: string) => void;
 }) {
-  const [h, m] = value.split(':').map(Number);
-  const [selectedHour, setSelectedHour] = useState(h);
-  const [selectedMinute, setSelectedMinute] = useState(m);
+  const [selectedPill, setSelectedPill] = useState<TimePillOption>(null);
+  const [customHour, setCustomHour] = useState(() => {
+    const hours = getAvailableHours();
+    return hours.length > 0 ? hours[0] : 23;
+  });
+  const [customMinute, setCustomMinute] = useState(0);
+  const [showCustom, setShowCustom] = useState(false);
+
+  const now = new Date();
+  const allMinutes = [0, 15, 30, 45];
+  const availableMinutes = customHour === now.getHours()
+    ? allMinutes.filter((m) => m > now.getMinutes())
+    : allMinutes;
 
   useEffect(() => {
     if (visible) {
       const [hh, mm] = value.split(':').map(Number);
-      setSelectedHour(hh);
-      setSelectedMinute(mm);
+      const matchedPreset = TIME_PRESETS.find((p) => {
+        const [ph, pm] = p.time.split(':').map(Number);
+        return ph === hh && pm === mm;
+      });
+      if (matchedPreset && !isPresetPast(matchedPreset.time)) {
+        setSelectedPill(matchedPreset.key);
+        setShowCustom(false);
+      } else {
+        setSelectedPill('custom');
+        setCustomHour(hh);
+        setCustomMinute(mm);
+        setShowCustom(true);
+      }
     }
   }, [visible, value]);
 
+  useEffect(() => {
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    if (customHour === currentHour && customMinute <= currentMinute) {
+      const nextValid = allMinutes.find((m) => m > currentMinute);
+      setCustomMinute(nextValid ?? 0);
+    }
+  }, [customHour]);
+
+  const handlePillPress = useCallback((key: TimePillOption) => {
+    if (key === selectedPill) {
+      setSelectedPill(null);
+      setShowCustom(false);
+      return;
+    }
+    setSelectedPill(key);
+    setShowCustom(key === 'custom');
+  }, [selectedPill]);
+
+  const getTimeString = (): string | null => {
+    if (!selectedPill) return null;
+    const preset = TIME_PRESETS.find((p) => p.key === selectedPill);
+    if (preset) return preset.time;
+    if (selectedPill === 'custom') {
+      return `${String(customHour).padStart(2, '0')}:${String(customMinute).padStart(2, '0')}`;
+    }
+    return null;
+  };
+
   const handleDone = () => {
-    const timeStr = `${String(selectedHour).padStart(2, '0')}:${String(selectedMinute).padStart(2, '0')}`;
-    onSelect(timeStr);
+    const time = getTimeString();
+    if (time) {
+      onSelect(time);
+    }
     onClose();
   };
 
@@ -90,45 +164,111 @@ function TimePicker({
           <View style={styles.pickerHandle} />
           <Text style={styles.pickerTitle}>Set Time</Text>
 
-          <View style={styles.pickerColumns}>
-            <ScrollView
-              style={styles.pickerColumn}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.pickerColumnContent}
-            >
-              {HOURS.map(hour => (
+          <View style={styles.pillRow}>
+            {TIME_PRESETS.map((preset) => {
+              const past = isPresetPast(preset.time);
+              return (
                 <Pressable
-                  key={hour}
-                  onPress={() => setSelectedHour(hour)}
-                  style={[styles.pickerOption, selectedHour === hour && styles.pickerOptionSelected]}
+                  key={preset.key}
+                  style={[
+                    styles.pill,
+                    selectedPill === preset.key && styles.pillSelected,
+                    past && styles.pillDisabled,
+                  ]}
+                  onPress={() => !past && handlePillPress(preset.key)}
+                  disabled={past}
                 >
-                  <Text style={[styles.pickerOptionText, selectedHour === hour && styles.pickerOptionTextSelected]}>
-                    {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
+                  <Feather
+                    name={preset.icon as any}
+                    size={14}
+                    color={past ? Colors.neutral : selectedPill === preset.key ? Colors.accent : Colors.textSecondary}
+                  />
+                  <Text style={[
+                    styles.pillText,
+                    selectedPill === preset.key && styles.pillTextSelected,
+                    past && styles.pillTextDisabled,
+                  ]}>
+                    {preset.label} {formatTime12h(preset.time)}
                   </Text>
                 </Pressable>
-              ))}
-            </ScrollView>
-            <ScrollView
-              style={styles.pickerColumn}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.pickerColumnContent}
+              );
+            })}
+            <Pressable
+              style={[
+                styles.pill,
+                selectedPill === 'custom' && styles.pillSelected,
+              ]}
+              onPress={() => handlePillPress('custom')}
             >
-              {MINUTES.map(minute => (
-                <Pressable
-                  key={minute}
-                  onPress={() => setSelectedMinute(minute)}
-                  style={[styles.pickerOption, selectedMinute === minute && styles.pickerOptionSelected]}
-                >
-                  <Text style={[styles.pickerOptionText, selectedMinute === minute && styles.pickerOptionTextSelected]}>
-                    :{String(minute).padStart(2, '0')}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
+              <Feather
+                name="sliders"
+                size={14}
+                color={selectedPill === 'custom' ? Colors.accent : Colors.textSecondary}
+              />
+              <Text style={[
+                styles.pillText,
+                selectedPill === 'custom' && styles.pillTextSelected,
+              ]}>
+                Custom
+              </Text>
+            </Pressable>
           </View>
 
-          <Pressable style={styles.pickerDoneBtn} onPress={handleDone}>
-            <Text style={styles.pickerDoneBtnText}>Done</Text>
+          {showCustom && (
+            <Animated.View entering={FadeInDown.duration(200)} style={styles.pickerColumns}>
+              <View style={styles.pickerColumnWrap}>
+                <Text style={styles.pickerColumnLabel}>Hour</Text>
+                <ScrollView
+                  style={styles.pickerColumn}
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={styles.pickerColumnContent}
+                >
+                  {getAvailableHours().map((h) => {
+                    let displayH = h;
+                    const ampm = h >= 12 ? 'p' : 'a';
+                    if (h === 0) displayH = 12;
+                    else if (h > 12) displayH = h - 12;
+                    return (
+                      <Pressable
+                        key={h}
+                        onPress={() => setCustomHour(h)}
+                        style={[styles.pickerOption, customHour === h && styles.pickerOptionSelected]}
+                      >
+                        <Text style={[styles.pickerOptionText, customHour === h && styles.pickerOptionTextSelected]}>
+                          {displayH}{ampm}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+              <View style={styles.pickerColumnWrap}>
+                <Text style={styles.pickerColumnLabel}>Min</Text>
+                <ScrollView
+                  style={styles.pickerColumn}
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={styles.pickerColumnContent}
+                >
+                  {availableMinutes.map((m) => (
+                    <Pressable
+                      key={m}
+                      onPress={() => setCustomMinute(m)}
+                      style={[styles.pickerOption, customMinute === m && styles.pickerOptionSelected]}
+                    >
+                      <Text style={[styles.pickerOptionText, customMinute === m && styles.pickerOptionTextSelected]}>
+                        :{String(m).padStart(2, '0')}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+            </Animated.View>
+          )}
+
+          <Pressable style={[styles.pickerDoneBtn, !selectedPill && styles.pickerDoneBtnDisabled]} onPress={handleDone} disabled={!selectedPill}>
+            <Text style={styles.pickerDoneBtnText}>
+              {selectedPill ? 'Done' : 'Pick a time'}
+            </Text>
           </Pressable>
         </Pressable>
       </Pressable>
@@ -189,10 +329,10 @@ export default function ProfileScreen() {
 
     if (value && !notifStatus.granted) {
       const granted = await requestNotificationPermissions();
+      await checkNotifStatus();
       if (!granted) {
         return;
       }
-      setNotifStatus({ granted: true, canAskAgain: true });
     }
 
     const updated = { ...profile.reminderPickTask, enabled: value };
@@ -200,6 +340,10 @@ export default function ProfileScreen() {
     trackReminderToggled('pick', value);
     const newProfile = { ...profile, reminderPickTask: updated };
     await rescheduleAllReminders(newProfile, todayEntry);
+
+    if (value) {
+      setTimePickerTarget('pick');
+    }
   };
 
   const handleTimeSelect = async (time: string) => {
@@ -336,6 +480,9 @@ export default function ProfileScreen() {
               />
             </View>
           </View>
+          {profile.reminderPickTask.enabled && parseInt(profile.reminderPickTask.time.split(':')[0], 10) >= 21 && (
+            <Text style={styles.cutoffWarning}>Reminders aren't sent after 9 PM</Text>
+          )}
 
         </Animated.View>
 
@@ -635,6 +782,49 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.neutral,
   },
+  cutoffWarning: {
+    fontFamily: 'DMSans_400Regular',
+    fontSize: 12,
+    color: '#D97706',
+    paddingHorizontal: 16,
+    marginTop: -4,
+    marginBottom: 8,
+  },
+  pillRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 20,
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 20,
+    backgroundColor: Colors.inputBg,
+  },
+  pillSelected: {
+    backgroundColor: Colors.accentLight,
+    borderColor: Colors.accent,
+    borderWidth: 1,
+  },
+  pillText: {
+    fontFamily: 'DMSans_500Medium',
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  pillTextSelected: {
+    color: Colors.accent,
+    fontFamily: 'DMSans_600SemiBold',
+  },
+  pillDisabled: {
+    opacity: 0.4,
+  },
+  pillTextDisabled: {
+    color: Colors.neutral,
+  },
   pickerOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
@@ -669,6 +859,15 @@ const styles = StyleSheet.create({
     gap: 16,
     marginBottom: 24,
   },
+  pickerColumnWrap: {
+    alignItems: 'center',
+  },
+  pickerColumnLabel: {
+    fontFamily: 'DMSans_600SemiBold',
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginBottom: 8,
+  },
   pickerColumn: {
     maxHeight: 200,
     width: 90,
@@ -687,9 +886,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accentLight,
   },
   pickerOptionText: {
-    fontFamily: 'DMSans_400Regular',
+    fontFamily: 'DMSans_500Medium',
     fontSize: 16,
-    color: Colors.textSecondary,
+    color: Colors.textPrimary,
   },
   pickerOptionTextSelected: {
     fontFamily: 'DMSans_600SemiBold',
@@ -700,6 +899,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 14,
     alignItems: 'center',
+  },
+  pickerDoneBtnDisabled: {
+    opacity: 0.4,
   },
   pickerDoneBtnText: {
     fontFamily: 'Nunito_600SemiBold',
