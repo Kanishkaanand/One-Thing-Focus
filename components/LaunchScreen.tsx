@@ -121,7 +121,7 @@ export default function LaunchScreen({ onComplete }: LaunchScreenProps) {
               },
             ]}
           >
-            {tagline ? `"${tagline}"` : ''}
+            {tagline || ''}
           </Animated.Text>
         </View>
       </Animated.View>

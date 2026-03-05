@@ -71,10 +71,6 @@ function formatTime12h(time24: string): string {
   return `${h}:${mStr} ${ampm}`;
 }
 
-function isAfter9PM(date: Date): boolean {
-  return date.getHours() >= 21;
-}
-
 export async function requestNotificationPermissions(): Promise<boolean> {
   if (Platform.OS === 'web') return false;
 
@@ -109,7 +105,7 @@ export async function openNotificationSettings(): Promise<void> {
   }
 }
 
-export type ScheduleStatus = 'scheduled' | 'past' | 'after-9pm' | 'no-permission' | 'web';
+export type ScheduleStatus = 'scheduled' | 'past' | 'no-permission' | 'web';
 
 export async function schedulePickTaskReminder(
   time: string,
@@ -122,8 +118,6 @@ export async function schedulePickTaskReminder(
   const [hourStr, minuteStr] = time.split(':');
   const hour = parseInt(hourStr, 10);
   const minute = parseInt(minuteStr, 10);
-
-  if (hour >= 21) return 'after-9pm';
 
   const messages = name ? pickTaskMessages : pickTaskMessagesNoName;
   const body = pickRandom(messages).replace('NAME', name || '');
@@ -210,25 +204,23 @@ export async function scheduleTaskNudge(
 
   const wrapUpTime = new Date(nudgeTime.getTime() + 2 * 60 * 60 * 1000);
 
-  if (!isAfter9PM(wrapUpTime)) {
-    const secondsUntilWrapUp = Math.floor((wrapUpTime.getTime() - now.getTime()) / 1000);
+  const secondsUntilWrapUp = Math.floor((wrapUpTime.getTime() - now.getTime()) / 1000);
 
-    if (secondsUntilWrapUp > 0) {
-      const wrapUpBody = pickRandom(wrapUpMessages).replace('TASK', taskText);
+  if (secondsUntilWrapUp > 0) {
+    const wrapUpBody = pickRandom(wrapUpMessages).replace('TASK', taskText);
 
-      await Notifications.scheduleNotificationAsync({
-        identifier: wrapUpId,
-        content: {
-          title: 'One Thing',
-          body: wrapUpBody,
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-          seconds: secondsUntilWrapUp,
-          repeats: false,
-        },
-      });
-    }
+    await Notifications.scheduleNotificationAsync({
+      identifier: wrapUpId,
+      content: {
+        title: 'One Thing',
+        body: wrapUpBody,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: secondsUntilWrapUp,
+        repeats: false,
+      },
+    });
   }
 
   return 'scheduled';

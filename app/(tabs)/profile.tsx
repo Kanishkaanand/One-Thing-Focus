@@ -480,9 +480,6 @@ export default function ProfileScreen() {
               />
             </View>
           </View>
-          {profile.reminderPickTask.enabled && parseInt(profile.reminderPickTask.time.split(':')[0], 10) >= 21 && (
-            <Text style={styles.cutoffWarning}>Reminders aren't sent after 9 PM</Text>
-          )}
 
         </Animated.View>
 
@@ -781,14 +778,6 @@ const styles = StyleSheet.create({
     fontFamily: 'DMSans_400Regular',
     fontSize: 13,
     color: Colors.neutral,
-  },
-  cutoffWarning: {
-    fontFamily: 'DMSans_400Regular',
-    fontSize: 12,
-    color: '#D97706',
-    paddingHorizontal: 16,
-    marginTop: -4,
-    marginBottom: 8,
   },
   pillRow: {
     flexDirection: 'row',
