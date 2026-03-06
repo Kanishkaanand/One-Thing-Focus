@@ -21,6 +21,7 @@ import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useApp } from '@/lib/AppContext';
 import { calculateCompletionRate, formatTime12h } from '@/lib/storage';
+import { BacklogSheet } from '@/components/modals';
 import {
   getNotificationPermissionStatus,
   requestNotificationPermissions,
@@ -40,19 +41,7 @@ const TIME_PRESETS: { key: TimePillOption; label: string; icon: string; time: st
 ];
 
 function getAvailableHours(): number[] {
-  const now = new Date();
-  const currentHour = now.getHours();
-  const earliest = now.getMinutes() >= 45 ? currentHour + 1 : currentHour;
-  const start = Math.max(earliest, 7);
-  const end = 23;
-  if (start > end) return [];
-  return Array.from({ length: end - start + 1 }, (_, i) => i + start);
-}
-
-function isPresetPast(time: string): boolean {
-  const [h, m] = time.split(':').map(Number);
-  const now = new Date();
-  return h < now.getHours() || (h === now.getHours() && m <= now.getMinutes());
+  return Array.from({ length: 17 }, (_, i) => i + 7); // 7 AM to 11 PM
 }
 
 const PRIVACY_POLICY_URL =
@@ -95,11 +84,7 @@ function TimePicker({
   const [customMinute, setCustomMinute] = useState(0);
   const [showCustom, setShowCustom] = useState(false);
 
-  const now = new Date();
   const allMinutes = [0, 15, 30, 45];
-  const availableMinutes = customHour === now.getHours()
-    ? allMinutes.filter((m) => m > now.getMinutes())
-    : allMinutes;
 
   useEffect(() => {
     if (visible) {
@@ -108,7 +93,7 @@ function TimePicker({
         const [ph, pm] = p.time.split(':').map(Number);
         return ph === hh && pm === mm;
       });
-      if (matchedPreset && !isPresetPast(matchedPreset.time)) {
+      if (matchedPreset) {
         setSelectedPill(matchedPreset.key);
         setShowCustom(false);
       } else {
@@ -119,15 +104,6 @@ function TimePicker({
       }
     }
   }, [visible, value]);
-
-  useEffect(() => {
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    if (customHour === currentHour && customMinute <= currentMinute) {
-      const nextValid = allMinutes.find((m) => m > currentMinute);
-      setCustomMinute(nextValid ?? 0);
-    }
-  }, [customHour]);
 
   const handlePillPress = useCallback((key: TimePillOption) => {
     if (key === selectedPill) {
@@ -165,34 +141,28 @@ function TimePicker({
           <Text style={styles.pickerTitle}>Set Time</Text>
 
           <View style={styles.pillRow}>
-            {TIME_PRESETS.map((preset) => {
-              const past = isPresetPast(preset.time);
-              return (
+            {TIME_PRESETS.map((preset) => (
                 <Pressable
                   key={preset.key}
                   style={[
                     styles.pill,
                     selectedPill === preset.key && styles.pillSelected,
-                    past && styles.pillDisabled,
                   ]}
-                  onPress={() => !past && handlePillPress(preset.key)}
-                  disabled={past}
+                  onPress={() => handlePillPress(preset.key)}
                 >
                   <Feather
                     name={preset.icon as any}
                     size={14}
-                    color={past ? Colors.neutral : selectedPill === preset.key ? Colors.accent : Colors.textSecondary}
+                    color={selectedPill === preset.key ? Colors.accent : Colors.textSecondary}
                   />
                   <Text style={[
                     styles.pillText,
                     selectedPill === preset.key && styles.pillTextSelected,
-                    past && styles.pillTextDisabled,
                   ]}>
                     {preset.label} {formatTime12h(preset.time)}
                   </Text>
                 </Pressable>
-              );
-            })}
+            ))}
             <Pressable
               style={[
                 styles.pill,
@@ -249,7 +219,7 @@ function TimePicker({
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={styles.pickerColumnContent}
                 >
-                  {availableMinutes.map((m) => (
+                  {allMinutes.map((m) => (
                     <Pressable
                       key={m}
                       onPress={() => setCustomMinute(m)}
@@ -279,13 +249,26 @@ function TimePicker({
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { profile, todayEntry, entries, updateProfile, resetAllData, isLoading } = useApp();
+  const {
+    profile,
+    todayEntry,
+    entries,
+    updateProfile,
+    resetAllData,
+    isLoading,
+    backlog,
+    addToBacklog,
+    removeFromBacklog,
+    addTaskFromBacklog,
+    canAddMoreTasks,
+  } = useApp();
   const isFocused = useIsFocused();
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [notifStatus, setNotifStatus] = useState<{ granted: boolean; canAskAgain: boolean }>({ granted: true, canAskAgain: true });
   const [timePickerTarget, setTimePickerTarget] = useState<'pick' | null>(null);
+  const [showBacklog, setShowBacklog] = useState(false);
 
   // Track screen views
   useScreenAnalytics('Profile');
@@ -446,7 +429,27 @@ export default function ProfileScreen() {
           <StatCard icon="percent" label="Completion" value={`${completionRate}%`} delay={350} />
         </View>
 
-        <Animated.View entering={FadeInDown.delay(400)} style={styles.settingsSection}>
+        <Animated.View entering={FadeInDown.delay(380)}>
+          <Pressable style={styles.backlogRow} onPress={() => setShowBacklog(true)}>
+            <View style={styles.backlogIconWrap}>
+              <Feather name="list" size={18} color={Colors.accent} />
+            </View>
+            <View style={styles.backlogTextWrap}>
+              <Text style={styles.backlogTitle}>Up Next</Text>
+              <Text style={styles.backlogSubtitle}>
+                {backlog.length === 0
+                  ? 'No tasks queued up'
+                  : `${backlog.length} task${backlog.length > 1 ? 's' : ''} waiting`}
+              </Text>
+            </View>
+            <View style={styles.backlogBadge}>
+              <Text style={styles.backlogBadgeText}>{backlog.length}/7</Text>
+            </View>
+            <Feather name="chevron-right" size={18} color={Colors.neutral} />
+          </Pressable>
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.delay(430)} style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>Reminders</Text>
 
           {showNotifWarning && (
@@ -564,6 +567,22 @@ export default function ProfileScreen() {
         }
         onClose={() => setTimePickerTarget(null)}
         onSelect={handleTimeSelect}
+      />
+
+      <BacklogSheet
+        visible={showBacklog}
+        backlogItems={backlog}
+        onAddItem={addToBacklog}
+        onRemoveItem={removeFromBacklog}
+        onPickForToday={async (itemId) => {
+          await addTaskFromBacklog(itemId);
+          setShowBacklog(false);
+        }}
+        canPickForToday={canAddMoreTasks}
+        pickedBacklogIds={todayEntry?.tasks
+          .filter(t => t.backlogItemId)
+          .map(t => t.backlogItemId!) ?? []}
+        onClose={() => setShowBacklog(false)}
       />
     </View>
   );
@@ -695,6 +714,53 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textSecondary,
   },
+  backlogRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 28,
+    gap: 14,
+    shadowColor: Colors.cardShadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  backlogIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.accentLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backlogTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  backlogTitle: {
+    fontFamily: 'Nunito_600SemiBold',
+    fontSize: 15,
+    color: Colors.textPrimary,
+  },
+  backlogSubtitle: {
+    fontFamily: 'DMSans_400Regular',
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  backlogBadge: {
+    backgroundColor: Colors.accentLight,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  backlogBadgeText: {
+    fontFamily: 'DMSans_600SemiBold',
+    fontSize: 12,
+    color: Colors.accent,
+  },
   settingsSection: {
     marginBottom: 28,
   },
@@ -807,12 +873,6 @@ const styles = StyleSheet.create({
   pillTextSelected: {
     color: Colors.accent,
     fontFamily: 'DMSans_600SemiBold',
-  },
-  pillDisabled: {
-    opacity: 0.4,
-  },
-  pillTextDisabled: {
-    color: Colors.neutral,
   },
   pickerOverlay: {
     flex: 1,

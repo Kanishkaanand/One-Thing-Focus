@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
-import { parseUserProfile, parseEntries } from './validation';
+import { parseUserProfile, parseEntries, parseBacklog } from './validation';
 import { createLogger } from './errorReporting';
 
 const logger = createLogger('Storage');
@@ -34,6 +34,13 @@ export interface TaskItem {
     uri: string;
   };
   isCompleted: boolean;
+  backlogItemId?: string;
+}
+
+export interface BacklogItem {
+  id: string;
+  text: string;
+  createdAt: string;
 }
 
 export interface DailyEntry {
@@ -51,6 +58,8 @@ export interface DailyEntry {
 
 const PROFILE_KEY = '@onething_profile';
 const ENTRIES_KEY = '@onething_entries';
+const BACKLOG_KEY = '@onething_backlog';
+const MAX_BACKLOG_SIZE = 7;
 
 // Storage quota constants (AsyncStorage limit is ~6MB on Android, ~10MB on iOS)
 const STORAGE_WARNING_THRESHOLD = 5 * 1024 * 1024; // 5MB warning
@@ -212,7 +221,43 @@ export function generateId(): string {
 }
 
 export async function clearAllData(): Promise<void> {
-  await AsyncStorage.multiRemove([PROFILE_KEY, ENTRIES_KEY]);
+  await AsyncStorage.multiRemove([PROFILE_KEY, ENTRIES_KEY, BACKLOG_KEY]);
+}
+
+// ============================================
+// Backlog Management
+// ============================================
+
+export async function getBacklog(): Promise<BacklogItem[]> {
+  try {
+    const data = await AsyncStorage.getItem(BACKLOG_KEY);
+    if (!data) return [];
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(data);
+    } catch {
+      logger.error(new Error('Backlog JSON parse failed'), 'getBacklog.parse');
+      return [];
+    }
+
+    return parseBacklog(parsed);
+  } catch (e) {
+    logger.error(e instanceof Error ? e : new Error(String(e)), 'getBacklog');
+    return [];
+  }
+}
+
+export async function saveBacklog(items: BacklogItem[]): Promise<void> {
+  const clamped = items.slice(0, MAX_BACKLOG_SIZE);
+  await AsyncStorage.setItem(BACKLOG_KEY, JSON.stringify(clamped));
+}
+
+export async function removeBacklogItem(itemId: string): Promise<BacklogItem[]> {
+  const items = await getBacklog();
+  const updated = items.filter(b => b.id !== itemId);
+  await saveBacklog(updated);
+  return updated;
 }
 
 // ============================================

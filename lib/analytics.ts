@@ -426,6 +426,22 @@ export async function trackDataReset(
   });
 }
 
+export async function trackBacklogItemAdded(backlogSize: number): Promise<void> {
+  await trackEvent('backlog_item_added', { backlogSize });
+}
+
+export async function trackBacklogItemRemoved(backlogSize: number): Promise<void> {
+  await trackEvent('backlog_item_removed', { backlogSize });
+}
+
+export async function trackBacklogItemCompleted(backlogSize: number): Promise<void> {
+  await trackEvent('backlog_item_completed', { backlogSize });
+}
+
+export async function trackTaskFromBacklog(level: number, taskCount: number): Promise<void> {
+  await trackEvent('task_created_from_backlog', { level, taskCount });
+}
+
 // ============================================
 // Analytics Retrieval
 // ============================================

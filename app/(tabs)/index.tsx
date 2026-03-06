@@ -51,6 +51,7 @@ import {
   ProofSheet,
   ReflectionModal,
   ProofViewModal,
+  BacklogSheet,
   type ProofOption,
   type MoodType,
 } from '@/components/modals';
@@ -467,6 +468,10 @@ export default function HomeScreen() {
     setJustLeveledUp,
     isLoading,
     storageStatus,
+    backlog,
+    addToBacklog,
+    removeFromBacklog,
+    addTaskFromBacklog,
   } = useApp();
 
   // Track screen views
@@ -484,6 +489,7 @@ export default function HomeScreen() {
   const [playAnimation, setPlayAnimation] = useState(false);
   const [proofToast, setProofToast] = useState(false);
   const [showWidgetTip, setShowWidgetTip] = useState(false);
+  const [showBacklog, setShowBacklog] = useState(false);
   const justCompletedRef = useRef(false);
   const pendingCelebrationRef = useRef(false);
 
@@ -574,6 +580,18 @@ export default function HomeScreen() {
       logger.error(e instanceof Error ? e : new Error(String(e)), 'addTask');
     }
   };
+
+  const handleAddFromBacklog = async (backlogItemId: string, scheduledTime?: string) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await addTaskFromBacklog(backlogItemId, scheduledTime);
+      setShowInput(false);
+    } catch (e) {
+      logger.error(e instanceof Error ? e : new Error(String(e)), 'addTaskFromBacklog');
+    }
+  };
+
+  const todayTaskTexts = todayEntry?.tasks.map(t => t.text) || [];
 
   const handleCompleteTask = (taskId: string) => {
     setCompletingTaskId(taskId);
@@ -867,6 +885,18 @@ export default function HomeScreen() {
                 </Text>
               </Pressable>
             )}
+
+            {!allDone && (
+              <Pressable
+                style={styles.manageBacklogBtn}
+                onPress={() => setShowBacklog(true)}
+              >
+                <Feather name="list" size={14} color={Colors.textSecondary} />
+                <Text style={styles.manageBacklogText}>
+                  Up Next ({backlog.length}/7)
+                </Text>
+              </Pressable>
+            )}
           </View>
         ) : (
           <Animated.View entering={FadeInDown.delay(400).duration(500)} style={styles.emptyState}>
@@ -885,6 +915,16 @@ export default function HomeScreen() {
               <Feather name="plus" size={20} color="#FFF" />
               <Text style={styles.addButtonText}>Pick your one thing</Text>
             </Pressable>
+
+            <Pressable
+              style={styles.manageBacklogBtn}
+              onPress={() => setShowBacklog(true)}
+            >
+              <Feather name="list" size={14} color={Colors.textSecondary} />
+              <Text style={styles.manageBacklogText}>
+                Up Next ({backlog.length}/7)
+              </Text>
+            </Pressable>
           </Animated.View>
         )}
 
@@ -896,6 +936,9 @@ export default function HomeScreen() {
         onChangeText={setTaskInput}
         onSubmit={handleAddTask}
         onClose={() => setShowInput(false)}
+        backlogItems={backlog}
+        onSelectBacklogItem={handleAddFromBacklog}
+        todayTaskTexts={todayTaskTexts}
       />
 
       <ProofSheet
@@ -930,6 +973,22 @@ export default function HomeScreen() {
           </View>
         </Animated.View>
       )}
+
+      <BacklogSheet
+        visible={showBacklog}
+        backlogItems={backlog}
+        onAddItem={addToBacklog}
+        onRemoveItem={removeFromBacklog}
+        onPickForToday={async (itemId) => {
+          await addTaskFromBacklog(itemId);
+          setShowBacklog(false);
+        }}
+        canPickForToday={canAddMoreTasks}
+        pickedBacklogIds={todayEntry?.tasks
+          .filter(t => t.backlogItemId)
+          .map(t => t.backlogItemId!) ?? []}
+        onClose={() => setShowBacklog(false)}
+      />
 
       <CelebrationOverlay
         visible={showCelebration}
@@ -1146,6 +1205,19 @@ const styles = StyleSheet.create({
   addMoreText: {
     fontFamily: 'DMSans_400Regular',
     fontSize: 14,
+    color: Colors.textSecondary,
+  },
+  manageBacklogBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  manageBacklogText: {
+    fontFamily: 'DMSans_400Regular',
+    fontSize: 13,
     color: Colors.textSecondary,
   },
 

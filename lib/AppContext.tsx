@@ -3,6 +3,7 @@ import {
   UserProfile,
   DailyEntry,
   TaskItem,
+  BacklogItem,
   getProfile,
   saveProfile,
   getAllEntries,
@@ -14,6 +15,9 @@ import {
   clearAllData,
   checkStorageQuota,
   StorageStatus,
+  getBacklog,
+  saveBacklog,
+  removeBacklogItem as removeBacklogItemFromStorage,
 } from './storage';
 import { createLogger } from './errorReporting';
 
@@ -30,6 +34,10 @@ import {
   trackLevelUp,
   trackReflectionAdded,
   trackDataReset,
+  trackBacklogItemAdded,
+  trackBacklogItemRemoved,
+  trackBacklogItemCompleted,
+  trackTaskFromBacklog,
 } from './analytics';
 
 interface AppContextValue {
@@ -50,6 +58,10 @@ interface AppContextValue {
   setJustLeveledUp: (v: boolean) => void;
   onResetCallback: (() => void) | null;
   setOnResetCallback: (cb: (() => void) | null) => void;
+  backlog: BacklogItem[];
+  addToBacklog: (text: string) => Promise<void>;
+  removeFromBacklog: (itemId: string) => Promise<void>;
+  addTaskFromBacklog: (backlogItemId: string, scheduledTime?: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -63,6 +75,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [justLeveledUp, setJustLeveledUp] = useState(false);
   const [onResetCallback, setOnResetCallback] = useState<(() => void) | null>(null);
   const [storageStatus, setStorageStatus] = useState<StorageStatus | null>(null);
+  const [backlog, setBacklog] = useState<BacklogItem[]>([]);
 
   const loadData = useCallback(async () => {
     try {
@@ -71,6 +84,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       let prof = await getProfile();
       const allEntries = await getAllEntries();
+      const backlogItems = await getBacklog();
+      setBacklog(backlogItems);
 
       // Track app opened with days since last open
       const lastEntry = Object.keys(allEntries).sort().pop();
@@ -222,9 +237,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setProfile(newProfile);
     setEntries(prev => ({ ...prev, [todayEntry.date]: updated }));
 
+    // Remove from backlog if this task originated from backlog
+    const completedTask = todayEntry.tasks.find(t => t.id === taskId);
+    if (completedTask?.backlogItemId) {
+      const updatedBacklog = backlog.filter(b => b.id !== completedTask.backlogItemId);
+      await saveBacklog(updatedBacklog);
+      setBacklog(updatedBacklog);
+      trackBacklogItemCompleted(updatedBacklog.length);
+    }
+
     await syncNotifications(newProfile, updated);
     syncWidgetData(newProfile, updated);
-  }, [todayEntry, profile]);
+  }, [todayEntry, profile, backlog]);
 
   const addReflection = useCallback(async (mood: 'energized' | 'calm' | 'neutral' | 'tough', note?: string) => {
     if (!todayEntry) return;
@@ -263,6 +287,69 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [todayEntry, profile]);
 
+  const addToBacklog = useCallback(async (text: string) => {
+    const validation = validateTaskInput(text);
+    if (!validation.valid) throw new Error(validation.error);
+
+    if (backlog.length >= 7) throw new Error('Backlog is full (max 7 items)');
+
+    const item: BacklogItem = {
+      id: generateId(),
+      text: validation.sanitized!,
+      createdAt: new Date().toISOString(),
+    };
+
+    const updated = [...backlog, item];
+    await saveBacklog(updated);
+    setBacklog(updated);
+    trackBacklogItemAdded(updated.length);
+  }, [backlog]);
+
+  const removeFromBacklog = useCallback(async (itemId: string) => {
+    const updated = backlog.filter(b => b.id !== itemId);
+    await saveBacklog(updated);
+    setBacklog(updated);
+    trackBacklogItemRemoved(updated.length);
+  }, [backlog]);
+
+  const addTaskFromBacklog = useCallback(async (backlogItemId: string, scheduledTime?: string) => {
+    if (!profile) return;
+
+    const backlogItem = backlog.find(b => b.id === backlogItemId);
+    if (!backlogItem) throw new Error('Backlog item not found');
+
+    const today = getTodayDate();
+    const current = todayEntry || {
+      date: today,
+      tasks: [] as TaskItem[],
+      completed: false,
+      levelAtTime: profile.currentLevel,
+    };
+
+    const newTask: TaskItem = {
+      id: generateId(),
+      text: backlogItem.text,
+      createdAt: new Date().toISOString(),
+      isCompleted: false,
+      backlogItemId,
+      ...(scheduledTime ? { scheduledTime } : {}),
+    };
+
+    const updated: DailyEntry = {
+      ...current,
+      tasks: [...current.tasks, newTask],
+    };
+
+    await saveEntry(updated);
+    setTodayEntry(updated);
+    setEntries(prev => ({ ...prev, [today]: updated }));
+
+    trackTaskFromBacklog(profile.currentLevel, updated.tasks.length);
+
+    await syncNotifications(profile, updated);
+    syncWidgetData(profile, updated);
+  }, [profile, todayEntry, backlog]);
+
   const resetAllData = useCallback(async () => {
     // Track data reset before clearing
     if (profile) {
@@ -272,6 +359,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await clearAllData();
     setJustLeveledUp(false);
     setYesterdayMissed(false);
+    setBacklog([]);
     onResetCallback?.();
     await loadData();
   }, [loadData, onResetCallback, profile]);
@@ -300,7 +388,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setJustLeveledUp,
     onResetCallback,
     setOnResetCallback,
-  }), [profile, todayEntry, entries, isLoading, storageStatus, updateProfile, addTask, completeTask, addReflection, canAddMoreTasks, loadData, resetAllData, yesterdayMissed, justLeveledUp, onResetCallback]);
+    backlog,
+    addToBacklog,
+    removeFromBacklog,
+    addTaskFromBacklog,
+  }), [profile, todayEntry, entries, isLoading, storageStatus, updateProfile, addTask, completeTask, addReflection, canAddMoreTasks, loadData, resetAllData, yesterdayMissed, justLeveledUp, onResetCallback, backlog, addToBacklog, removeFromBacklog, addTaskFromBacklog]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

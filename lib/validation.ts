@@ -35,7 +35,16 @@ export const TaskItemSchema = z.object({
   scheduledTime: z.string().optional(),
   proof: TaskProofSchema.optional(),
   isCompleted: z.boolean(),
+  backlogItemId: z.string().optional(),
 });
+
+export const BacklogItemSchema = z.object({
+  id: z.string(),
+  text: z.string().min(1),
+  createdAt: z.string(),
+});
+
+export const BacklogArraySchema = z.array(BacklogItemSchema);
 
 export const ReflectionSchema = z.object({
   mood: z.enum(['energized', 'calm', 'neutral', 'tough']),
@@ -219,6 +228,19 @@ export function parseUserProfile(data: unknown): z.infer<typeof UserProfileSchem
   }
   console.warn('Invalid profile data:', result.error.issues);
   return null;
+}
+
+/**
+ * Safely parses and validates a backlog array
+ * Returns validated items or empty array if invalid
+ */
+export function parseBacklog(data: unknown): z.infer<typeof BacklogItemSchema>[] {
+  const result = BacklogArraySchema.safeParse(data);
+  if (result.success) {
+    return result.data;
+  }
+  console.warn('Invalid backlog data:', result.error.issues);
+  return [];
 }
 
 /**
